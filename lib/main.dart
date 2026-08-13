@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'context/app_state.dart';
 import 'screens/tela_inicio.dart'; // ⚠️ Se sua tela inicial tiver outro nome, troque aqui
+import 'screens/tela_dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

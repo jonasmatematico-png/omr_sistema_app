@@ -11,6 +11,7 @@ import 'tela_gabarito.dart';
 import 'tela_confirmacao.dart';
 import 'tela_resultado_turma.dart';
 import 'tela_analise.dart';
+import 'tela_dashboard.dart'; // 🚨 IMPORT DO DASHBOARD ADICIONADO AQUI
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -59,19 +60,24 @@ class _TelaAlunosState extends State<TelaAlunos> {
 
       for (int i = 0; i < respostas.length; i++) {
         if (i >= avaliacao.gabarito.length) break; // Proteção extra
-        bool acertou = (respostas[i].trim().toUpperCase() ==
+        bool acertou =
+            (respostas[i].trim().toUpperCase() ==
             avaliacao.gabarito[i].trim().toUpperCase());
         respostasCorretas.add(acertou);
 
         if (acertou && i < avaliacao.niveis.length) {
           String nivel = avaliacao.niveis[i].toLowerCase();
-          if (nivel.contains("básic")) acertosBasico++;
-          else if (nivel.contains("inter")) acertosInter++;
-          else if (nivel.contains("avanç")) acertosAvanc++;
+          if (nivel.contains("básic"))
+            acertosBasico++;
+          else if (nivel.contains("inter"))
+            acertosInter++;
+          else if (nivel.contains("avanç"))
+            acertosAvanc++;
         }
       }
 
-      double percentual = (respostasCorretas.where((e) => e).length /
+      double percentual =
+          (respostasCorretas.where((e) => e).length /
               avaliacao.gabarito.length) *
           100;
       String nivelSaeb = Resultado.calcularNivelSaeb(notaExata);
@@ -187,7 +193,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
       if (result.images != null && result.images!.isNotEmpty) {
         File fotoRecortada = File(result.images!.first);
 
-        int indexAlvo = indexEspecifico ?? appState.alunos.indexWhere((a) => a.estaPendente);
+        int indexAlvo =
+            indexEspecifico ??
+            appState.alunos.indexWhere((a) => a.estaPendente);
 
         if (indexAlvo != -1 && mounted) {
           Aluno alunoAlvo = appState.alunos[indexAlvo];
@@ -198,7 +206,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
             // 🔹 PASSO 1: TESTE DE CONECTIVIDADE ANTES DO ENVIO
             String urlServidor = appState.ipServidor;
             print("🔍 Testando conectividade com: $urlServidor");
-            final responseConexao = await http.get(Uri.parse(urlServidor)).timeout(const Duration(seconds: 15));
+            final responseConexao = await http
+                .get(Uri.parse(urlServidor))
+                .timeout(const Duration(seconds: 15));
             print("✅ Conectividade OK. Status: ${responseConexao.statusCode}");
 
             // 2. Cria a requisição para o servidor Python
@@ -217,7 +227,8 @@ class _TelaAlunosState extends State<TelaAlunos> {
               appState.avaliacaoSelecionada!.gabarito,
             );
             request.fields['id_aluno'] = alunoAlvo.id.toString();
-            request.fields['id_avaliacao'] = appState.avaliacaoSelecionada!.id.toString();
+            request.fields['id_avaliacao'] = appState.avaliacaoSelecionada!.id
+                .toString();
 
             // 5. Envia e aguarda a resposta (timeout aumentado)
             var response = await request.send().timeout(
@@ -229,7 +240,8 @@ class _TelaAlunosState extends State<TelaAlunos> {
               var respStr = await response.stream.bytesToString();
               var jsonResp = jsonDecode(respStr);
 
-              if (jsonResp['sucesso'] == true && jsonResp['resultado'] != null) {
+              if (jsonResp['sucesso'] == true &&
+                  jsonResp['resultado'] != null) {
                 print("✅ Correção recebida do servidor com sucesso!");
 
                 // 7. ATRIBUI AS RESPOSTAS LIDAS PELO PYTHON
@@ -237,34 +249,40 @@ class _TelaAlunosState extends State<TelaAlunos> {
                   respostasParaRevisar = List<String>.from(
                     jsonResp['resultado']['respostas'],
                   );
-                  print("👁️ Respostas recebidas do Python: $respostasParaRevisar");
+                  print(
+                    "👁️ Respostas recebidas do Python: $respostasParaRevisar",
+                  );
                 } else {
-                   print("⚠️ Servidor não retornou lista de respostas.");
+                  print("⚠️ Servidor não retornou lista de respostas.");
                 }
               } else {
-                print("❌ Erro retornado pelo servidor: ${jsonResp['erro'] ?? 'Desconhecido'}");
+                print(
+                  "❌ Erro retornado pelo servidor: ${jsonResp['erro'] ?? 'Desconhecido'}",
+                );
                 // Mesmo com erro de lógica, tenta obter as respostas se vierem
-                 if (jsonResp['resultado']?['respostas'] != null) {
+                if (jsonResp['resultado']?['respostas'] != null) {
                   respostasParaRevisar = List<String>.from(
                     jsonResp['resultado']['respostas'],
                   );
-                  print("👁️ Tentando usar respostas mesmo com erro: $respostasParaRevisar");
+                  print(
+                    "👁️ Tentando usar respostas mesmo com erro: $respostasParaRevisar",
+                  );
                 }
               }
             } else {
-               // Se o status não for 200, é um erro HTTP
-               String errorBody = await response.stream.bytesToString();
-               print("❌ Erro HTTP ${response.statusCode}: $errorBody");
+              // Se o status não for 200, é um erro HTTP
+              String errorBody = await response.stream.bytesToString();
+              print("❌ Erro HTTP ${response.statusCode}: $errorBody");
             }
           } catch (e) {
             print("⚠️ Erro no envio da foto ou recepção da resposta: $e");
-             // Em caso de erro de envio/recepção, mantém a lista vazia
-             // A lógica de preenchimento com vazio vem depois
           }
 
           // 8. CORREÇÃO: Se o Python não retornou respostas válidas, preenche com vazio
           if (respostasParaRevisar.isEmpty) {
-            print("⚠️ Python não retornou respostas ou houve erro. Preenchendo com 'Em branco' para revisão manual.");
+            print(
+              "⚠️ Python não retornou respostas ou houve erro. Preenchendo com 'Em branco' para revisão manual.",
+            );
             respostasParaRevisar = List.filled(
               appState.avaliacaoSelecionada!.gabarito.length,
               "", // String vazia = Em branco, para revisão
@@ -278,16 +296,24 @@ class _TelaAlunosState extends State<TelaAlunos> {
 
           for (int i = 0; i < respostasParaRevisar.length; i++) {
             if (i < gabarito.length && i < pesos.length) {
-              // Considera acerto apenas se a resposta do aluno for válida e correta
               bool respostaValida = respostasParaRevisar[i].isNotEmpty;
-              bool acertou = respostaValida && (respostasParaRevisar[i].trim().toUpperCase() == gabarito[i].trim().toUpperCase());
+              bool acertou =
+                  respostaValida &&
+                  (respostasParaRevisar[i].trim().toUpperCase() ==
+                      gabarito[i].trim().toUpperCase());
               if (acertou) {
-                 notaExataComPesos += pesos[i];
-                 print("📝 Q${i+1}: '${respostasParaRevisar[i]}' == '${gabarito[i]}' (Peso: ${pesos[i]}) -> ACERTOU (+${pesos[i]})");
-              } else if (respostaValida){
-                 print("📝 Q${i+1}: '${respostasParaRevisar[i]}' != '${gabarito[i]}' (Peso: ${pesos[i]}) -> ERROU");
+                notaExataComPesos += pesos[i];
+                print(
+                  "📝 Q${i + 1}: '${respostasParaRevisar[i]}' == '${gabarito[i]}' (Peso: ${pesos[i]}) -> ACERTOU (+${pesos[i]})",
+                );
+              } else if (respostaValida) {
+                print(
+                  "📝 Q${i + 1}: '${respostasParaRevisar[i]}' != '${gabarito[i]}' (Peso: ${pesos[i]}) -> ERROU",
+                );
               } else {
-                 print("📝 Q${i+1}: 'Em branco' (Peso: ${pesos[i]}) -> NÃO CONSIDERADO");
+                print(
+                  "📝 Q${i + 1}: 'Em branco' (Peso: ${pesos[i]}) -> NÃO CONSIDERADO",
+                );
               }
             }
           }
@@ -301,20 +327,17 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 builder: (context) => TelaConfirmacao(
                   fotoRecortada: fotoRecortada,
                   nomeAluno: alunoAlvo.nome,
-                  respostasDetectadas: respostasParaRevisar, // Envia as respostas reais (lidas ou vazias)
+                  respostasDetectadas: respostasParaRevisar,
                   onConfirmar: (notaConfirmada, respostasConfirmadas) {
                     setState(() {
                       alunoAlvo.status = "Corrigido";
-                      // Usa a nota calculada aqui ou a confirmada, dependendo da preferência
-                      // Vamos usar a calculada baseada nas respostas *antes* da confirmação manual
                       alunoAlvo.notaFinal = (notaExataComPesos + 0.5).toInt();
                       alunoAlvo.notaExata = notaExataComPesos;
-                      alunoAlvo.respostas = respostasConfirmadas; // Salva as respostas confirmadas
+                      alunoAlvo.respostas = respostasConfirmadas;
                     });
-                    // Salva usando as respostas *confirmadas* e a nota *calculada* (ou a confirmada, se preferir)
                     _salvarCorrecaoInteligente(
                       alunoAlvo,
-                      notaExataComPesos, // ou notaConfirmada, se quiser usar a do callback
+                      notaExataComPesos,
                       respostasConfirmadas,
                     );
                   },
@@ -337,7 +360,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
       print("❌ Erro geral na câmera: $e");
       setState(() => processandoFoto = false);
       if (mounted) {
-         ScaffoldMessenger.of(context).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erro na câmera: $e"),
             backgroundColor: Colors.red,
@@ -408,7 +431,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
             ),
             ElevatedButton(
               onPressed: () async {
-                if (nomeController.text.isEmpty || numeroController.text.isEmpty) return;
+                if (nomeController.text.isEmpty ||
+                    numeroController.text.isEmpty)
+                  return;
 
                 Navigator.pop(dialogContext);
 
@@ -422,7 +447,8 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 final sucesso = await appState.adicionarNovoAluno(
                   idTurma: appState.turmaSelecionada!.id,
                   nome: nomeController.text.trim(),
-                  numeroChamada: int.tryParse(numeroController.text.trim()) ?? 0,
+                  numeroChamada:
+                      int.tryParse(numeroController.text.trim()) ?? 0,
                 );
 
                 if (mounted) {
@@ -556,272 +582,321 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 ),
               ),
 
-              Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    ElevatedButton.icon(
-                      onPressed: _selecionarAvaliacao,
-                      icon: const Icon(Icons.cloud_download, size: 22),
-                      label: const Text(
-                        " CARREGAR GABARITO DA AVALIAÇÃO",
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.teal,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        minimumSize: const Size(double.infinity, 50),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => const TelaGabarito(),
-                              ),
-                            ),
-                            icon: const Icon(
-                              Icons.playlist_add_check,
-                              size: 22,
-                            ),
-                            label: const Text(
-                              "GABARITO MANUAL",
-                              style: TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: Colors.indigo,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              side: BorderSide(color: Colors.indigo.shade300),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          flex: 2,
-                          child: ElevatedButton.icon(
-                            onPressed: processandoFoto
-                                ? null
-                                : () => _abrirCameraCorrecao(),
-                            icon: const Icon(Icons.camera_alt, size: 24),
-                            label: const Text(
-                              "LER PROVAS EM FILA",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green.shade600,
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              elevation: 4,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
               Expanded(
-                child: appState.carregandoDados
-                    ? const Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            CircularProgressIndicator(color: Colors.indigo),
-                            SizedBox(height: 16),
-                            Text(
-                              "📡 Buscando alunos no Supabase...",
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        // 🚨 BOTÃO NOVO DO DASHBOARD 🚨
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const TelaDashboard(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.dashboard, size: 22),
+                            label: const Text(
+                              "📊 ABRIR DASHBOARD",
                               style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16,
-                                color: Colors.indigo,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.deepPurple,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12), // Espacinho
+
+                        ElevatedButton.icon(
+                          onPressed: _selecionarAvaliacao,
+                          icon: const Icon(Icons.cloud_download, size: 22),
+                          label: const Text(
+                            " CARREGAR GABARITO DA AVALIAÇÃO",
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.teal,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            minimumSize: const Size(double.infinity, 50),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                onPressed: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => const TelaGabarito(),
+                                  ),
+                                ),
+                                icon: const Icon(
+                                  Icons.playlist_add_check,
+                                  size: 22,
+                                ),
+                                label: const Text(
+                                  "GABARITO MANUAL",
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: Colors.indigo,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  side: BorderSide(
+                                    color: Colors.indigo.shade300,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: ElevatedButton.icon(
+                                onPressed: processandoFoto
+                                    ? null
+                                    : () => _abrirCameraCorrecao(),
+                                icon: const Icon(Icons.camera_alt, size: 24),
+                                label: const Text(
+                                  "LER PROVAS EM FILA",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green.shade600,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  elevation: 4,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                      )
-                    : alunos.isEmpty
-                    ? const Center(
-                        child: Text(
-                          "Nenhum aluno ATIVO encontrado nesta turma.",
-                          style: TextStyle(color: Colors.grey, fontSize: 16),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                        itemCount: alunos.length,
-                        itemBuilder: (context, index) {
-                          final aluno = alunos[index];
-                          final bool corrigido = aluno.foiCorrigido;
-                          final bool ausente = aluno.estaAusente;
+                        const SizedBox(height: 16),
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            elevation: 1,
-                            color: ausente
-                                ? Colors.grey.shade100
-                                : Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: BorderSide(
-                                color: corrigido
-                                    ? Colors.green.shade300
-                                    : (ausente
-                                          ? Colors.orange.shade300
-                                          : Colors.grey.shade300),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: ListTile(
-                              isThreeLine: true,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              leading: CircleAvatar(
-                                backgroundColor: corrigido
-                                    ? Colors.green.shade100
-                                    : (ausente
-                                          ? Colors.orange.shade100
-                                          : Colors.grey.shade200),
-                                child: Icon(
-                                  corrigido
-                                      ? Icons.check
-                                      : (ausente
-                                            ? Icons.person_off
-                                            : Icons.person_outline),
-                                  color: corrigido
-                                      ? Colors.green.shade800
-                                      : (ausente
-                                            ? Colors.orange.shade800
-                                            : Colors.grey.shade700),
-                                ),
-                              ),
-                              title: Text(
-                                "${aluno.numeroChamada ?? (index + 1)}. ${aluno.nome}",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  decoration: ausente
-                                      ? TextDecoration.lineThrough
-                                      : TextDecoration.none,
-                                  color: corrigido
-                                      ? Colors.black87
-                                      : (ausente
-                                            ? Colors.grey.shade500
-                                            : Colors.grey.shade800),
-                                ),
-                              ),
-                              subtitle: Text(
-                                corrigido
-                                    ? "Toque para ver o Perfil SAEB"
-                                    : (ausente
-                                          ? "Aluno ausente"
-                                          : "Pendente • Escolha uma ação 👉"),
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: corrigido
-                                      ? Colors.indigo.shade700
-                                      : (ausente
-                                            ? Colors.orange.shade800
-                                            : Colors.grey.shade600),
-                                ),
-                              ),
-
-                              // 🚨 LADO A LADO: Botão à esquerda, notas à direita
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  // BOTÃO DE RE-CORRIGIR
-                                  IconButton(
-                                    icon: const Icon(
-                                      Icons.refresh,
-                                      color: Colors.blue,
-                                      size: 28,
+                        appState.carregandoDados
+                            ? const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    CircularProgressIndicator(
+                                      color: Colors.indigo,
                                     ),
-                                    tooltip: "Re-corrigir",
-                                    onPressed: () {
-                                      setState(() {
-                                        aluno.status = "Pendente";
-                                        aluno.notaFinal = null;
-                                        aluno.notaExata = null;
-                                      });
-                                      _abrirCameraCorrecao(
-                                        indexEspecifico: index,
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(width: 8),
-
-                                  // NOTAS LADO A LADO
-                                  Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.end,
-                                    children: [
-                                      Text(
-                                        "Ex: ${aluno.notaExata?.toStringAsFixed(2) ?? '-'}",
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.grey.shade600,
-                                          fontStyle: FontStyle.italic,
-                                        ),
+                                    SizedBox(height: 16),
+                                    Text(
+                                      "📡 Buscando alunos no Supabase...",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                        color: Colors.indigo,
                                       ),
-                                      const SizedBox(height: 2),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.green.shade50,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
-                                          ),
-                                          border: Border.all(
-                                            color: Colors.green,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          "${aluno.notaFinal}",
-                                          style: TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 12,
-                                            color: Colors.green.shade800,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-
-                              onTap: () => Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => TelaAnalise(aluno: aluno),
+                                    ),
+                                  ],
                                 ),
+                              )
+                            : alunos.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  "Nenhum aluno ATIVO encontrado nesta turma.",
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              )
+                            : ListView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                padding: EdgeInsets.zero,
+                                itemCount: alunos.length,
+                                itemBuilder: (context, index) {
+                                  final aluno = alunos[index];
+                                  final bool corrigido = aluno.foiCorrigido;
+                                  final bool ausente = aluno.estaAusente;
+
+                                  return Card(
+                                    margin: const EdgeInsets.only(bottom: 10),
+                                    elevation: 1,
+                                    color: ausente
+                                        ? Colors.grey.shade100
+                                        : Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                      side: BorderSide(
+                                        color: corrigido
+                                            ? Colors.green.shade300
+                                            : (ausente
+                                                  ? Colors.orange.shade300
+                                                  : Colors.grey.shade300),
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    child: ListTile(
+                                      isThreeLine: true,
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
+                                      leading: CircleAvatar(
+                                        backgroundColor: corrigido
+                                            ? Colors.green.shade100
+                                            : (ausente
+                                                  ? Colors.orange.shade100
+                                                  : Colors.grey.shade200),
+                                        child: Icon(
+                                          corrigido
+                                              ? Icons.check
+                                              : (ausente
+                                                    ? Icons.person_off
+                                                    : Icons.person_outline),
+                                          color: corrigido
+                                              ? Colors.green.shade800
+                                              : (ausente
+                                                    ? Colors.orange.shade800
+                                                    : Colors.grey.shade700),
+                                        ),
+                                      ),
+                                      title: Text(
+                                        "${aluno.numeroChamada ?? (index + 1)}. ${aluno.nome}",
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          decoration: ausente
+                                              ? TextDecoration.lineThrough
+                                              : TextDecoration.none,
+                                          color: corrigido
+                                              ? Colors.black87
+                                              : (ausente
+                                                    ? Colors.grey.shade500
+                                                    : Colors.grey.shade800),
+                                        ),
+                                      ),
+                                      subtitle: Text(
+                                        corrigido
+                                            ? "Toque para ver o Perfil SAEB"
+                                            : (ausente
+                                                  ? "Aluno ausente"
+                                                  : "Pendente • Escolha uma ação 👉"),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: corrigido
+                                              ? Colors.indigo.shade700
+                                              : (ausente
+                                                    ? Colors.orange.shade800
+                                                    : Colors.grey.shade600),
+                                        ),
+                                      ),
+
+                                      trailing: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.refresh,
+                                              color: Colors.blue,
+                                              size: 28,
+                                            ),
+                                            tooltip: "Re-corrigir",
+                                            onPressed: () {
+                                              setState(() {
+                                                aluno.status = "Pendente";
+                                                aluno.notaFinal = null;
+                                                aluno.notaExata = null;
+                                              });
+                                              _abrirCameraCorrecao(
+                                                indexEspecifico: index,
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(width: 8),
+
+                                          Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
+                                            children: [
+                                              Text(
+                                                "Ex: ${aluno.notaExata?.toStringAsFixed(2) ?? '-'}",
+                                                style: TextStyle(
+                                                  fontSize: 10,
+                                                  color: Colors.grey.shade600,
+                                                  fontStyle: FontStyle.italic,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green.shade50,
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: Colors.green,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  "${aluno.notaFinal}",
+                                                  style: TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 12,
+                                                    color:
+                                                        Colors.green.shade800,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+
+                                      onTap: () => Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) =>
+                                              TelaAnalise(aluno: aluno),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
                               ),
-                            ),
-                          );
-                        },
-                      ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -853,6 +928,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
             ),
         ],
       ),
+
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _mostrarDialogoAdicionarAluno(context),
         backgroundColor: Colors.indigo,
