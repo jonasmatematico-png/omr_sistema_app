@@ -318,6 +318,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
             }
           }
 
+          // 🚨 TRAVA DE SEGURANÇA: a nota nunca passa de 10
+          if (notaExataComPesos > 10) notaExataComPesos = 10;
+
           setState(() => processandoFoto = false);
 
           if (mounted) {
