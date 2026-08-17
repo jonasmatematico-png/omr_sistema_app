@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'tela_analise_detalhada.dart';
+import 'tela_analise_questao.dart';
 
 class TelaDashboard extends StatefulWidget {
   const TelaDashboard({super.key});
@@ -55,8 +56,7 @@ class _TelaDashboardState extends State<TelaDashboard> {
     return double.tryParse('$notaBruta') ?? 0.0;
   }
 
-  // 🚨 BUSCA TODAS AS LINHAS EM PÁGINAS DE 1000
-  // (o Supabase corta em 1000 por vez — era isso que fazia alunos "sumirem"!)
+  // 🚨 Busca TODAS as linhas em páginas de 1000 (o Supabase corta em 1000 por vez)
   Future<List<Map<String, dynamic>>> _buscarTudo(
     SupabaseClient supabase,
     String tabela,
@@ -83,7 +83,6 @@ class _TelaDashboardState extends State<TelaDashboard> {
     try {
       final supabase = Supabase.instance.client;
 
-      // 🚨 Agora busca TUDO, sem corte de 1000 linhas
       final turmasResp = await _buscarTudo(supabase, 'turmas');
       final alunosResp = await _buscarTudo(supabase, 'alunos');
       final resultadosResp = await _buscarTudo(supabase, 'resultados');
@@ -249,6 +248,16 @@ class _TelaDashboardState extends State<TelaDashboard> {
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline, size: 28),
+            tooltip: 'Análise por Questão',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const TelaAnaliseQuestao()),
+            ),
+          ),
+        ],
       ),
       body: carregando
           ? const Center(
