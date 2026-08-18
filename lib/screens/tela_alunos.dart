@@ -11,7 +11,7 @@ import 'tela_gabarito.dart';
 import 'tela_confirmacao.dart';
 import 'tela_resultado_turma.dart';
 import 'tela_analise.dart';
-import 'tela_dashboard.dart'; // 🚨 IMPORT DO DASHBOARD ADICIONADO AQUI
+import 'tela_dashboard.dart'; // 🚨 IMPORT DO DASHBOARD
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -34,7 +34,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
     });
   }
 
-double _pesoEscola(String nivel) {
+  // 🚨 PESOS OFICIAIS DA ESCOLA (decodificados da planilha PARÂMETROS)
+  // Básico = 1,0 | Intermediário = 1,25 | Avançado = 0,67
+  double _pesoEscola(String nivel) {
     final n = nivel.toLowerCase();
     if (n.contains('inter')) return 1.25;
     if (n.contains('avanç')) return 0.67;
@@ -298,35 +300,37 @@ double _pesoEscola(String nivel) {
 
           // 9. Cálculo da nota baseado nas respostas *reais* (vazias ou lidas)
           double notaExataComPesos = 0.0;
-                    final gabarito = appState.avaliacaoSelecionada!.gabarito;
-                    final niveis = appState.avaliacaoSelecionada!.niveis;
+          final gabarito = appState.avaliacaoSelecionada!.gabarito;
+          final niveis = appState.avaliacaoSelecionada!.niveis;
 
-                    for (int i = 0; i < respostasParaRevisar.length; i++) {
-                      if (i < gabarito.length && i < niveis.length) {
-                        double peso = _pesoEscola(niveis[i]);
+          for (int i = 0; i < respostasParaRevisar.length; i++) {
+            if (i < gabarito.length && i < niveis.length) {
+              // 🚨 USA O PESO OFICIAL DA ESCOLA (1.0, 1.25 ou 0.67)
+              double peso = _pesoEscola(niveis[i]);
+
               bool respostaValida = respostasParaRevisar[i].isNotEmpty;
               bool acertou =
                   respostaValida &&
                   (respostasParaRevisar[i].trim().toUpperCase() ==
                       gabarito[i].trim().toUpperCase());
               if (acertou) {
-                notaExataComPesos += pesos[i];
+                notaExataComPesos += peso;
                 print(
-                  "📝 Q${i + 1}: '${respostasParaRevisar[i]}' == '${gabarito[i]}' (Peso: ${pesos[i]}) -> ACERTOU (+${pesos[i]})",
+                  "📝 Q${i + 1}: '${respostasParaRevisar[i]}' == '${gabarito[i]}' (Peso: $peso) -> ACERTOU (+$peso)",
                 );
               } else if (respostaValida) {
                 print(
-                  "📝 Q${i + 1}: '${respostasParaRevisar[i]}' != '${gabarito[i]}' (Peso: ${pesos[i]}) -> ERROU",
+                  "📝 Q${i + 1}: '${respostasParaRevisar[i]}' != '${gabarito[i]}' (Peso: $peso) -> ERROU",
                 );
               } else {
                 print(
-                  "📝 Q${i + 1}: 'Em branco' (Peso: ${pesos[i]}) -> NÃO CONSIDERADO",
+                  "📝 Q${i + 1}: 'Em branco' (Peso: $peso) -> NÃO CONSIDERADO",
                 );
               }
             }
           }
 
-          // 🚨 TRAVA DE SEGURANÇA: a nota nunca passa de 10
+          // 🚨 TRAVA DE SEGURANÇA: a nota nunca passa de 10 (MÍNIMO da escola)
           if (notaExataComPesos > 10) notaExataComPesos = 10;
 
           setState(() => processandoFoto = false);
@@ -614,10 +618,7 @@ double _pesoEscola(String nivel) {
                             icon: const Icon(Icons.dashboard, size: 22),
                             label: const Text(
                               "📊 ABRIR DASHBOARD",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.deepPurple,
@@ -629,7 +630,7 @@ double _pesoEscola(String nivel) {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12), // Espacinho
+                        const SizedBox(height: 12),
 
                         ElevatedButton.icon(
                           onPressed: _selecionarAvaliacao,
@@ -670,12 +671,8 @@ double _pesoEscola(String nivel) {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   foregroundColor: Colors.indigo,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                  side: BorderSide(
-                                    color: Colors.indigo.shade300,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  side: BorderSide(color: Colors.indigo.shade300),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -700,9 +697,7 @@ double _pesoEscola(String nivel) {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green.shade600,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
                                   elevation: 4,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
@@ -719,9 +714,7 @@ double _pesoEscola(String nivel) {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    CircularProgressIndicator(
-                                      color: Colors.indigo,
-                                    ),
+                                    CircularProgressIndicator(color: Colors.indigo),
                                     SizedBox(height: 16),
                                     Text(
                                       "📡 Buscando alunos no Supabase...",
@@ -738,10 +731,7 @@ double _pesoEscola(String nivel) {
                             ? const Center(
                                 child: Text(
                                   "Nenhum aluno ATIVO encontrado nesta turma.",
-                                  style: TextStyle(
-                                    color: Colors.grey,
-                                    fontSize: 16,
-                                  ),
+                                  style: TextStyle(color: Colors.grey, fontSize: 16),
                                 ),
                               )
                             : ListView.builder(
@@ -773,11 +763,10 @@ double _pesoEscola(String nivel) {
                                     ),
                                     child: ListTile(
                                       isThreeLine: true,
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 8,
-                                          ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
                                       leading: CircleAvatar(
                                         backgroundColor: corrigido
                                             ? Colors.green.shade100
@@ -852,8 +841,7 @@ double _pesoEscola(String nivel) {
 
                                           Column(
                                             mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.end,
+                                            crossAxisAlignment: CrossAxisAlignment.end,
                                             children: [
                                               Text(
                                                 "Ex: ${aluno.notaExata?.toStringAsFixed(2) ?? '-'}",
@@ -865,15 +853,15 @@ double _pesoEscola(String nivel) {
                                               ),
                                               const SizedBox(height: 2),
                                               Container(
-                                                padding:
-                                                    const EdgeInsets.symmetric(
-                                                      horizontal: 8,
-                                                      vertical: 2,
-                                                    ),
+                                                padding: const EdgeInsets.symmetric(
+                                                  horizontal: 8,
+                                                  vertical: 2,
+                                                ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.green.shade50,
-                                                  borderRadius:
-                                                      BorderRadius.circular(12),
+                                                  borderRadius: BorderRadius.circular(
+                                                    12,
+                                                  ),
                                                   border: Border.all(
                                                     color: Colors.green,
                                                   ),
@@ -883,8 +871,7 @@ double _pesoEscola(String nivel) {
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 12,
-                                                    color:
-                                                        Colors.green.shade800,
+                                                    color: Colors.green.shade800,
                                                   ),
                                                 ),
                                               ),
