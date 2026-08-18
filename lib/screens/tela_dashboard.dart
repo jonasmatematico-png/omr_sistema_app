@@ -134,12 +134,12 @@ class _TelaDashboardState extends State<TelaDashboard> {
         else cAbaixo++;
       });
 
-      mediaGeral = totalAlunos > 0 ? somaNotas / totalAlunos : 0;
       if (totalAlunos > 0) {
-        pctAbaixo = (cAbaixo * 100) ~/ totalAlunos;
-        pctBasico = (cBasico * 100) ~/ totalAlunos;
-        pctAdequado = (cAdequado * 100) ~/ totalAlunos;
-        pctAvancado = (cAvancado * 100) ~/ totalAlunos;
+        // 🚨 Arredonda como a escola (36,67% vira 37%)
+        pctAbaixo = (cAbaixo * 100 / totalAlunos).round();
+        pctBasico = (cBasico * 100 / totalAlunos).round();
+        pctAdequado = (cAdequado * 100 / totalAlunos).round();
+        pctAvancado = (cAvancado * 100 / totalAlunos).round();
       }
 
       // ---------- % DE ACERTO POR DESCRITOR ----------
@@ -223,10 +223,10 @@ class _TelaDashboardState extends State<TelaDashboard> {
           'nome': (t['nome'] ?? 'Turma').toString(),
           'alunos': n,
           'media': n > 0 ? soma / n : 0.0,
-          'abaixo': n > 0 ? (tAbaixo * 100) ~/ n : 0,
-          'basico': n > 0 ? (tBasico * 100) ~/ n : 0,
-          'adequado': n > 0 ? (tAdequado * 100) ~/ n : 0,
-          'avancado': n > 0 ? (tAvancado * 100) ~/ n : 0,
+          'abaixo': n > 0 ? (tAbaixo * 100 / n).round() : 0,
+          'basico': n > 0 ? (tBasico * 100 / n).round() : 0,
+          'adequado': n > 0 ? (tAdequado * 100 / n).round() : 0,
+          'avancado': n > 0 ? (tAvancado * 100 / n).round() : 0,
           'descritor': descCritico,
         });
       }
