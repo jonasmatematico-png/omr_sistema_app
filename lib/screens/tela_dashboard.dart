@@ -33,6 +33,7 @@ class _TelaDashboardState extends State<TelaDashboard> {
     _carregarDados();
   }
 
+  // 🚨 CORTES OFICIAIS DA ESCOLA (da aba PARÂMETROS)
   String _nivelPorNota(double nota) {
     if (nota >= 8.67) return 'Avançado';
     if (nota >= 6.51) return 'Adequado';
@@ -50,13 +51,14 @@ class _TelaDashboardState extends State<TelaDashboard> {
     return 'Abaixo';
   }
 
+  // 🚨 USA NOTA BRUTA (sem arredondar), igual à "Nota Diagnóstica" da escola
   double _notaDe(dynamic r) {
     final notaBruta = r['nota_bruta'] ?? r['nota_final'];
     if (notaBruta is num) return notaBruta.toDouble();
     return double.tryParse('$notaBruta') ?? 0.0;
   }
 
-  // 🚨 Busca TODAS as linhas em páginas de 1000 (o Supabase corta em 1000 por vez)
+  // Busca TODAS as linhas em páginas de 1000 (Supabase corta em 1000 por vez)
   Future<List<Map<String, dynamic>>> _buscarTudo(
     SupabaseClient supabase,
     String tabela,
@@ -124,22 +126,30 @@ class _TelaDashboardState extends State<TelaDashboard> {
 
       resultadoDoAluno.forEach((idAluno, r) {
         if (!alunosValidos.contains(idAluno)) return;
-        totalAlunos++; // conta só quem tem resposta REAL + resultado
+        totalAlunos++;
         final nota = _notaDe(r);
         somaNotas += nota;
         final cat = _categoriaNivel(r['nivel_saeb'], nota);
-        if (cat == 'Avançado') cAvancado++;
-        else if (cat == 'Adequado') cAdequado++;
-        else if (cat == 'Básico') cBasico++;
-        else cAbaixo++;
+        if (cat == 'Avançado')
+          cAvancado++;
+        else if (cat == 'Adequado')
+          cAdequado++;
+        else if (cat == 'Básico')
+          cBasico++;
+        else
+          cAbaixo++;
       });
+
+      // 🚨 CÁLCULO DA MÉDIA GERAL
+      mediaGeral = totalAlunos > 0 ? somaNotas / totalAlunos : 0;
 
       if (totalAlunos > 0) {
         // 🚨 Arredonda como a escola (36,67% vira 37%)
-      pctAbaixo = (cAbaixo * 100 / totalAlunos).round();
+        pctAbaixo = (cAbaixo * 100 / totalAlunos).round();
         pctBasico = (cBasico * 100 / totalAlunos).round();
         pctAdequado = (cAdequado * 100 / totalAlunos).round();
         pctAvancado = (cAvancado * 100 / totalAlunos).round();
+      }
 
       // ---------- % DE ACERTO POR DESCRITOR ----------
       final Map<String, List<int>> acertosDescritor = {};
@@ -147,7 +157,8 @@ class _TelaDashboardState extends State<TelaDashboard> {
         final respostaLida = (resp['resposta_aluno'] ?? '').toString().trim();
         if (respostaLida.isEmpty) continue;
         final desc =
-            descritorQuestao['${resp['id_avaliacao']}-${resp['id_questao']}'] ?? '';
+            descritorQuestao['${resp['id_avaliacao']}-${resp['id_questao']}'] ??
+            '';
         if (desc.isEmpty) continue;
         final v = acertosDescritor.putIfAbsent(desc, () => [0, 0]);
         v[1] = v[1] + 1;
@@ -190,10 +201,14 @@ class _TelaDashboardState extends State<TelaDashboard> {
           soma += nota;
           n++;
           final cat = _categoriaNivel(r['nivel_saeb'], nota);
-          if (cat == 'Avançado') tAvancado++;
-          else if (cat == 'Adequado') tAdequado++;
-          else if (cat == 'Básico') tBasico++;
-          else tAbaixo++;
+          if (cat == 'Avançado')
+            tAvancado++;
+          else if (cat == 'Adequado')
+            tAdequado++;
+          else if (cat == 'Básico')
+            tBasico++;
+          else
+            tAbaixo++;
         });
 
         // descritor crítico da turma (o com mais erros)
@@ -205,7 +220,8 @@ class _TelaDashboardState extends State<TelaDashboard> {
           final idAluno = '${resp['id_aluno']}';
           if (turmaDoAluno[idAluno] != idTurma) continue;
           final desc =
-              descritorQuestao['${resp['id_avaliacao']}-${resp['id_questao']}'] ?? '';
+              descritorQuestao['${resp['id_avaliacao']}-${resp['id_questao']}'] ??
+              '';
           if (desc.isEmpty) continue;
           errosDesc[desc] = (errosDesc[desc] ?? 0) + 1;
         }
@@ -253,7 +269,9 @@ class _TelaDashboardState extends State<TelaDashboard> {
             tooltip: 'Análise por Questão',
             onPressed: () => Navigator.push(
               context,
-              MaterialPageRoute(builder: (context) => const TelaAnaliseQuestao()),
+              MaterialPageRoute(
+                builder: (context) => const TelaAnaliseQuestao(),
+              ),
             ),
           ),
         ],
@@ -267,164 +285,300 @@ class _TelaDashboardState extends State<TelaDashboard> {
                   SizedBox(height: 16),
                   Text(
                     '📊 Calculando indicadores no Supabase...',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.indigo),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.indigo,
+                    ),
                   ),
                 ],
               ),
             )
           : erro != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.error_outline, size: 48, color: Colors.red),
-                        const SizedBox(height: 12),
-                        Text(
-                          'Erro ao carregar o dashboard:\n$erro',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.red),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: _carregarDados,
-                          child: const Text('Tentar novamente'),
-                        ),
-                      ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
                     ),
-                  ),
-                )
-              : SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 12),
+                    Text(
+                      'Erro ao carregar o dashboard:\n$erro',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.red),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _carregarDados,
+                      child: const Text('Tentar novamente'),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Professor(a): JONAS OLIVEIRA RIBEIRO',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                const Text(
-                                  'Professor(a): JONAS OLIVEIRA RIBEIRO',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                ),
-                                const SizedBox(height: 8),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    _buildInfoChip('Disciplina', 'Matemática'),
-                                    _buildInfoChip('Turma', '6º ano'),
-                                    _buildInfoChip('Bimestre', '2º'),
-                                  ],
-                                ),
-                                const Divider(height: 24),
-                                Column(
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Expanded(child: _buildMetricCard('Média Geral', mediaGeral.toStringAsFixed(2), '', Colors.blue)),
-                                        const SizedBox(width: 10),
-                                        Expanded(child: _buildMetricCard('Total Alunos', '$totalAlunos', 'corrigidos', Colors.green)),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        Expanded(child: _buildMetricCard('Menor % (descritor)', '${pctMin.toStringAsFixed(0)}%', descritorMin, Colors.red)),
-                                        const SizedBox(width: 10),
-                                        Expanded(child: _buildMetricCard('Maior % (descritor)', '${pctMax.toStringAsFixed(0)}%', descritorMax, Colors.orange)),
-                                      ],
-                                    ),
-                                  ],
-                                ),
+                                _buildInfoChip('Disciplina', 'Matemática'),
+                                _buildInfoChip('Turma', '6º ano'),
+                                _buildInfoChip('Bimestre', '2º'),
                               ],
                             ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        const Text(
-                          'Resultados por Turma',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 10),
-                        Card(
-                          elevation: 2,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: DataTable(
-                              headingRowColor: MaterialStateProperty.all(Colors.indigo.shade50),
-                              columns: const [
-                                DataColumn(label: Text('Turma', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Alunos', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Média', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Abaixo', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Básico', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Adequado', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Avançado', style: TextStyle(fontWeight: FontWeight.bold))),
-                                DataColumn(label: Text('Descritor', style: TextStyle(fontWeight: FontWeight.bold))),
-                              ],
-                              rows: turmas.map((t) {
-                                return DataRow(cells: [
-                                  DataCell(Text(t['nome'], style: const TextStyle(fontWeight: FontWeight.bold))),
-                                  DataCell(Text('${t['alunos']}')),
-                                  DataCell(Text((t['media'] as double).toStringAsFixed(2))),
-                                  DataCell(_buildPercentageCell(t['abaixo'] as int, Colors.red)),
-                                  DataCell(_buildPercentageCell(t['basico'] as int, Colors.orange)),
-                                  DataCell(_buildPercentageCell(t['adequado'] as int, Colors.blue)),
-                                  DataCell(_buildPercentageCell(t['avancado'] as int, Colors.green)),
-                                  DataCell(Text(t['descritor'], style: const TextStyle(color: Colors.redAccent, fontSize: 12))),
-                                ]);
-                              }).toList(),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-
-                        Card(
-                          elevation: 2,
-                          color: Colors.amber.shade50,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            const Divider(height: 24),
+                            Column(
                               children: [
                                 Row(
                                   children: [
-                                    Icon(Icons.auto_awesome, color: Colors.amber.shade800),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Resumo Automático',
-                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                    Expanded(
+                                      child: _buildMetricCard(
+                                        'Média Geral',
+                                        mediaGeral.toStringAsFixed(2),
+                                        '',
+                                        Colors.blue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _buildMetricCard(
+                                        'Total Alunos',
+                                        '$totalAlunos',
+                                        'corrigidos',
+                                        Colors.green,
+                                      ),
                                     ),
                                   ],
                                 ),
                                 const SizedBox(height: 10),
-                                Text(
-                                  'A avaliação aplicada registrou média geral de ${mediaGeral.toStringAsFixed(2)} pontos, com participação de $totalAlunos estudantes. '
-                                  'A distribuição por nível de proficiência indica $pctAbaixo% no nível Abaixo do Básico, $pctBasico% no nível Básico, $pctAdequado% no nível Adequado e $pctAvancado% no nível Avançado. '
-                                  'Na análise por descritores, o menor índice de acerto foi "$descritorMin" (${pctMin.toStringAsFixed(0)}%), configurando-se como o descritor de menor desempenho, '
-                                  'enquanto o melhor desempenho foi "$descritorMax" (${pctMax.toStringAsFixed(0)}%). '
-                                  'Os dados consolidados expressam o panorama quantitativo do desempenho das turmas na avaliação aplicada.',
-                                  style: const TextStyle(height: 1.5, fontSize: 14),
-                                  textAlign: TextAlign.justify,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: _buildMetricCard(
+                                        'Menor % (descritor)',
+                                        '${pctMin.toStringAsFixed(0)}%',
+                                        descritorMin,
+                                        Colors.red,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: _buildMetricCard(
+                                        'Maior % (descritor)',
+                                        '${pctMax.toStringAsFixed(0)}%',
+                                        descritorMax,
+                                        Colors.orange,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
                             ),
-                          ),
+                          ],
                         ),
-                        const SizedBox(height: 80),
-                      ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+
+                    const Text(
+                      'Resultados por Turma',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Card(
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor: MaterialStateProperty.all(
+                            Colors.indigo.shade50,
+                          ),
+                          columns: const [
+                            DataColumn(
+                              label: Text(
+                                'Turma',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Alunos',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Média',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Abaixo',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Básico',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Adequado',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Avançado',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                            DataColumn(
+                              label: Text(
+                                'Descritor',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ),
+                          ],
+                          rows: turmas.map((t) {
+                            return DataRow(
+                              cells: [
+                                DataCell(
+                                  Text(
+                                    t['nome'],
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(Text('${t['alunos']}')),
+                                DataCell(
+                                  Text(
+                                    (t['media'] as double).toStringAsFixed(2),
+                                  ),
+                                ),
+                                DataCell(
+                                  _buildPercentageCell(
+                                    t['abaixo'] as int,
+                                    Colors.red,
+                                  ),
+                                ),
+                                DataCell(
+                                  _buildPercentageCell(
+                                    t['basico'] as int,
+                                    Colors.orange,
+                                  ),
+                                ),
+                                DataCell(
+                                  _buildPercentageCell(
+                                    t['adequado'] as int,
+                                    Colors.blue,
+                                  ),
+                                ),
+                                DataCell(
+                                  _buildPercentageCell(
+                                    t['avancado'] as int,
+                                    Colors.green,
+                                  ),
+                                ),
+                                DataCell(
+                                  Text(
+                                    t['descritor'],
+                                    style: const TextStyle(
+                                      color: Colors.redAccent,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    Card(
+                      elevation: 2,
+                      color: Colors.amber.shade50,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.auto_awesome,
+                                  color: Colors.amber.shade800,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Resumo Automático',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'A avaliação aplicada registrou média geral de ${mediaGeral.toStringAsFixed(2)} pontos, com participação de $totalAlunos estudantes. '
+                              'A distribuição por nível de proficiência indica $pctAbaixo% no nível Abaixo do Básico, $pctBasico% no nível Básico, $pctAdequado% no nível Adequado e $pctAvancado% no nível Avançado. '
+                              'Na análise por descritores, o menor índice de acerto foi "$descritorMin" (${pctMin.toStringAsFixed(0)}%), configurando-se como o descritor de menor desempenho, '
+                              'enquanto o melhor desempenho foi "$descritorMax" (${pctMax.toStringAsFixed(0)}%). '
+                              'Os dados consolidados expressam o panorama quantitativo do desempenho das turmas na avaliação aplicada.',
+                              style: const TextStyle(height: 1.5, fontSize: 14),
+                              textAlign: TextAlign.justify,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 80),
+                  ],
                 ),
+              ),
+            ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
@@ -447,12 +601,20 @@ class _TelaDashboardState extends State<TelaDashboard> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(
+          value,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, String value, String subtitle, Color color) {
+  Widget _buildMetricCard(
+    String title,
+    String value,
+    String subtitle,
+    Color color,
+  ) {
     return Container(
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
@@ -465,11 +627,28 @@ class _TelaDashboardState extends State<TelaDashboard> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(title, style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w600)),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
           if (subtitle.isNotEmpty)
-            Text(subtitle, style: TextStyle(fontSize: 10, color: color.withOpacity(0.8))),
+            Text(
+              subtitle,
+              style: TextStyle(fontSize: 10, color: color.withOpacity(0.8)),
+            ),
         ],
       ),
     );
