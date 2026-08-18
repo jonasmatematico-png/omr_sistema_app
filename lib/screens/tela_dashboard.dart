@@ -34,9 +34,9 @@ class _TelaDashboardState extends State<TelaDashboard> {
   }
 
   String _nivelPorNota(double nota) {
-    if (nota >= 8) return 'Avançado';
-    if (nota >= 6) return 'Adequado';
-    if (nota >= 4) return 'Básico';
+    if (nota >= 8.67) return 'Avançado';
+    if (nota >= 6.51) return 'Adequado';
+    if (nota >= 5) return 'Básico';
     return 'Abaixo do Básico';
   }
 

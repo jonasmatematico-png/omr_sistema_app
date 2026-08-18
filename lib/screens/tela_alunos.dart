@@ -34,6 +34,13 @@ class _TelaAlunosState extends State<TelaAlunos> {
     });
   }
 
+double _pesoEscola(String nivel) {
+    final n = nivel.toLowerCase();
+    if (n.contains('inter')) return 1.25;
+    if (n.contains('avanç')) return 0.67;
+    return 1.0; // Básico
+  }
+
   Future<void> _salvarCorrecaoInteligente(
     Aluno aluno,
     double notaExata,
@@ -291,11 +298,12 @@ class _TelaAlunosState extends State<TelaAlunos> {
 
           // 9. Cálculo da nota baseado nas respostas *reais* (vazias ou lidas)
           double notaExataComPesos = 0.0;
-          final gabarito = appState.avaliacaoSelecionada!.gabarito;
-          final pesos = appState.avaliacaoSelecionada!.pesos;
+                    final gabarito = appState.avaliacaoSelecionada!.gabarito;
+                    final niveis = appState.avaliacaoSelecionada!.niveis;
 
-          for (int i = 0; i < respostasParaRevisar.length; i++) {
-            if (i < gabarito.length && i < pesos.length) {
+                    for (int i = 0; i < respostasParaRevisar.length; i++) {
+                      if (i < gabarito.length && i < niveis.length) {
+                        double peso = _pesoEscola(niveis[i]);
               bool respostaValida = respostasParaRevisar[i].isNotEmpty;
               bool acertou =
                   respostaValida &&
