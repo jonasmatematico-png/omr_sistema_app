@@ -51,7 +51,7 @@ class _TelaDashboardState extends State<TelaDashboard> {
   }
 
   double _notaDe(dynamic r) {
-    final notaBruta = r['nota_final'];
+    final notaBruta = r['nota_bruta'] ?? r['nota_final'];
     if (notaBruta is num) return notaBruta.toDouble();
     return double.tryParse('$notaBruta') ?? 0.0;
   }
@@ -136,11 +136,10 @@ class _TelaDashboardState extends State<TelaDashboard> {
 
       if (totalAlunos > 0) {
         // 🚨 Arredonda como a escola (36,67% vira 37%)
-        pctAbaixo = (cAbaixo * 100 / totalAlunos).round();
+      pctAbaixo = (cAbaixo * 100 / totalAlunos).round();
         pctBasico = (cBasico * 100 / totalAlunos).round();
         pctAdequado = (cAdequado * 100 / totalAlunos).round();
         pctAvancado = (cAvancado * 100 / totalAlunos).round();
-      }
 
       // ---------- % DE ACERTO POR DESCRITOR ----------
       final Map<String, List<int>> acertosDescritor = {};
