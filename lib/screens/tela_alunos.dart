@@ -11,7 +11,8 @@ import 'tela_gabarito.dart';
 import 'tela_confirmacao.dart';
 import 'tela_resultado_turma.dart';
 import 'tela_analise.dart';
-import 'tela_dashboard.dart'; // 🚨 IMPORT DO DASHBOARD
+import 'tela_dashboard.dart';
+import 'tela_perfil_aluno.dart'; // 🚨 IMPORT ADICIONADO
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -34,13 +35,11 @@ class _TelaAlunosState extends State<TelaAlunos> {
     });
   }
 
-  // 🚨 PESOS OFICIAIS DA ESCOLA (decodificados da planilha PARÂMETROS)
-  // Básico = 1,0 | Intermediário = 1,25 | Avançado = 0,67
   double _pesoEscola(String nivel) {
     final n = nivel.toLowerCase();
     if (n.contains('inter')) return 1.25;
     if (n.contains('avanç')) return 0.67;
-    return 1.0; // Básico
+    return 1.0;
   }
 
   Future<void> _salvarCorrecaoInteligente(
@@ -68,7 +67,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
       List<bool> respostasCorretas = [];
 
       for (int i = 0; i < respostas.length; i++) {
-        if (i >= avaliacao.gabarito.length) break; // Proteção extra
+        if (i >= avaliacao.gabarito.length) break;
         bool acertou =
             (respostas[i].trim().toUpperCase() ==
             avaliacao.gabarito[i].trim().toUpperCase());
@@ -212,7 +211,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
           List<String> respostasParaRevisar = [];
 
           try {
-            // 🔹 PASSO 1: TESTE DE CONECTIVIDADE ANTES DO ENVIO
             String urlServidor = appState.ipServidor;
             print("🔍 Testando conectividade com: $urlServidor");
             final responseConexao = await http
@@ -220,18 +218,15 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 .timeout(const Duration(seconds: 15));
             print("✅ Conectividade OK. Status: ${responseConexao.statusCode}");
 
-            // 2. Cria a requisição para o servidor Python
             var request = http.MultipartRequest(
               'POST',
-              Uri.parse("$urlServidor/corrigir"), // Concatenação segura
+              Uri.parse("$urlServidor/corrigir"),
             );
 
-            // 3. Adiciona a foto recortada
             request.files.add(
               await http.MultipartFile.fromPath('image', fotoRecortada.path),
             );
 
-            // 4. Adiciona o gabarito e os IDs
             request.fields['gabarito'] = jsonEncode(
               appState.avaliacaoSelecionada!.gabarito,
             );
@@ -239,12 +234,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
             request.fields['id_avaliacao'] = appState.avaliacaoSelecionada!.id
                 .toString();
 
-            // 5. Envia e aguarda a resposta (timeout aumentado)
             var response = await request.send().timeout(
-              const Duration(seconds: 90), // Timeout longo para Render Free
+              const Duration(seconds: 90),
             );
 
-            // 6. Trata a resposta
             if (response.statusCode == 200) {
               var respStr = await response.stream.bytesToString();
               var jsonResp = jsonDecode(respStr);
@@ -253,7 +246,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
                   jsonResp['resultado'] != null) {
                 print("✅ Correção recebida do servidor com sucesso!");
 
-                // 7. ATRIBUI AS RESPOSTAS LIDAS PELO PYTHON
                 if (jsonResp['resultado']['respostas'] != null) {
                   respostasParaRevisar = List<String>.from(
                     jsonResp['resultado']['respostas'],
@@ -268,7 +260,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 print(
                   "❌ Erro retornado pelo servidor: ${jsonResp['erro'] ?? 'Desconhecido'}",
                 );
-                // Mesmo com erro de lógica, tenta obter as respostas se vierem
                 if (jsonResp['resultado']?['respostas'] != null) {
                   respostasParaRevisar = List<String>.from(
                     jsonResp['resultado']['respostas'],
@@ -279,7 +270,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 }
               }
             } else {
-              // Se o status não for 200, é um erro HTTP
               String errorBody = await response.stream.bytesToString();
               print("❌ Erro HTTP ${response.statusCode}: $errorBody");
             }
@@ -287,25 +277,22 @@ class _TelaAlunosState extends State<TelaAlunos> {
             print("⚠️ Erro no envio da foto ou recepção da resposta: $e");
           }
 
-          // 8. CORREÇÃO: Se o Python não retornou respostas válidas, preenche com vazio
           if (respostasParaRevisar.isEmpty) {
             print(
               "⚠️ Python não retornou respostas ou houve erro. Preenchendo com 'Em branco' para revisão manual.",
             );
             respostasParaRevisar = List.filled(
               appState.avaliacaoSelecionada!.gabarito.length,
-              "", // String vazia = Em branco, para revisão
+              "",
             );
           }
 
-          // 9. Cálculo da nota baseado nas respostas *reais* (vazias ou lidas)
           double notaExataComPesos = 0.0;
           final gabarito = appState.avaliacaoSelecionada!.gabarito;
           final niveis = appState.avaliacaoSelecionada!.niveis;
 
           for (int i = 0; i < respostasParaRevisar.length; i++) {
             if (i < gabarito.length && i < niveis.length) {
-              // 🚨 USA O PESO OFICIAL DA ESCOLA (1.0, 1.25 ou 0.67)
               double peso = _pesoEscola(niveis[i]);
 
               bool respostaValida = respostasParaRevisar[i].isNotEmpty;
@@ -330,7 +317,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
             }
           }
 
-          // 🚨 TRAVA DE SEGURANÇA: a nota nunca passa de 10 (MÍNIMO da escola)
           if (notaExataComPesos > 10) notaExataComPesos = 10;
 
           setState(() => processandoFoto = false);
@@ -603,7 +589,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        // 🚨 BOTÃO NOVO DO DASHBOARD 🚨
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton.icon(
@@ -618,7 +603,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
                             icon: const Icon(Icons.dashboard, size: 22),
                             label: const Text(
                               "📊 ABRIR DASHBOARD",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.deepPurple,
@@ -671,8 +659,12 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   foregroundColor: Colors.indigo,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
-                                  side: BorderSide(color: Colors.indigo.shade300),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  side: BorderSide(
+                                    color: Colors.indigo.shade300,
+                                  ),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
@@ -697,7 +689,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.green.shade600,
                                   foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
                                   elevation: 4,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
@@ -714,7 +708,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    CircularProgressIndicator(color: Colors.indigo),
+                                    CircularProgressIndicator(
+                                      color: Colors.indigo,
+                                    ),
                                     SizedBox(height: 16),
                                     Text(
                                       "📡 Buscando alunos no Supabase...",
@@ -731,7 +727,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
                             ? const Center(
                                 child: Text(
                                   "Nenhum aluno ATIVO encontrado nesta turma.",
-                                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               )
                             : ListView.builder(
@@ -763,10 +762,11 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                     ),
                                     child: ListTile(
                                       isThreeLine: true,
-                                      contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16,
-                                        vertical: 8,
-                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 8,
+                                          ),
                                       leading: CircleAvatar(
                                         backgroundColor: corrigido
                                             ? Colors.green.shade100
@@ -841,7 +841,8 @@ class _TelaAlunosState extends State<TelaAlunos> {
 
                                           Column(
                                             mainAxisSize: MainAxisSize.min,
-                                            crossAxisAlignment: CrossAxisAlignment.end,
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.end,
                                             children: [
                                               Text(
                                                 "Ex: ${aluno.notaExata?.toStringAsFixed(2) ?? '-'}",
@@ -853,15 +854,15 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                               ),
                                               const SizedBox(height: 2),
                                               Container(
-                                                padding: const EdgeInsets.symmetric(
-                                                  horizontal: 8,
-                                                  vertical: 2,
-                                                ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2,
+                                                    ),
                                                 decoration: BoxDecoration(
                                                   color: Colors.green.shade50,
-                                                  borderRadius: BorderRadius.circular(
-                                                    12,
-                                                  ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
                                                   border: Border.all(
                                                     color: Colors.green,
                                                   ),
@@ -871,7 +872,8 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 12,
-                                                    color: Colors.green.shade800,
+                                                    color:
+                                                        Colors.green.shade800,
                                                   ),
                                                 ),
                                               ),
@@ -880,11 +882,12 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                         ],
                                       ),
 
+                                      // 🚨 CORREÇÃO: onTap apontando para TelaPerfilAluno
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) =>
-                                              TelaAnalise(aluno: aluno),
+                                              TelaPerfilAluno(aluno: aluno),
                                         ),
                                       ),
                                     ),

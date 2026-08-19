@@ -5,6 +5,7 @@ import '../models/aluno_model.dart';
 import '../models/turma_model.dart';
 import '../models/avaliacao_model.dart';
 import '../services/supabase_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppState extends ChangeNotifier {
   String ipServidor = "http://192.168.3.20:5000";
@@ -111,8 +112,63 @@ class AppState extends ChangeNotifier {
     _carregandoDados = true;
     notifyListeners();
     try {
+      // 1. Busca os alunos normalmente
       _alunos = await service.buscarAlunosDaTurma(idTurma);
-      print("✅ [AppState] ${_alunos.length} alunos carregados com sucesso!");
+
+      // 🚨 2. NOVO: Busca os resultados (notas) salvos no Supabase para esses alunos
+      if (_alunos.isNotEmpty) {
+        try {
+          final supabase = Supabase.instance.client;
+          final idsAlunos = _alunos.map((a) => a.id).toList();
+
+          // Pega os resultados de todos os alunos da turma de uma vez
+          final resultados = await supabase
+              .from('resultados')
+              .select('id_aluno, nota_bruta, nota_final, nivel_saeb')
+              .inFilter('id_aluno', idsAlunos);
+
+          // Cria um mapa rápido: id_aluno -> resultado
+          final Map<int, Map<String, dynamic>> mapaResultados = {};
+          for (final r in resultados) {
+            mapaResultados[r['id_aluno'] as int] = r;
+          }
+
+          // 🚨 3. NOVO: "Mescla" as notas salvas nos objetos Aluno
+          int alunosComNota = 0;
+          for (final aluno in _alunos) {
+            final resultado = mapaResultados[aluno.id];
+            if (resultado != null) {
+              // Converte os valores do banco para os tipos do modelo Aluno
+              final notaBruta = resultado['nota_bruta'];
+              final notaFinal = resultado['nota_final'];
+              final nivelSaeb = resultado['nivel_saeb']?.toString() ?? '';
+
+              aluno.notaExata = notaBruta is num
+                  ? notaBruta.toDouble()
+                  : double.tryParse('$notaBruta');
+              aluno.notaFinal = notaFinal is num
+                  ? notaFinal.toInt()
+                  : int.tryParse('$notaFinal');
+
+              // 🚨 Apenas mudamos o status para "Corrigido".
+              // O app entende automaticamente que foiCorrigido = true, estaPendente = false, etc.
+              aluno.status = "Corrigido";
+              alunosComNota++;
+            }
+          }
+
+          print(
+            "✅ [AppState] ${_alunos.length} alunos carregados, $alunosComNota com notas do banco!",
+          );
+        } catch (eResultados) {
+          print(
+            "⚠️ [AppState] Não foi possível carregar resultados: $eResultados",
+          );
+          // Mesmo com erro, continua com os alunos (sem notas)
+        }
+      } else {
+        print("✅ [AppState] Nenhum aluno encontrado nesta turma.");
+      }
     } catch (e) {
       print("❌ [AppState] Erro ao carregar alunos: $e");
     } finally {
