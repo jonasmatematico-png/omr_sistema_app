@@ -1,18 +1,23 @@
-import 'dart:io'; // Import necessário para SocketException
+import 'dart:io';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import '../context/app_state.dart';
 import '../models/aluno_model.dart';
 import '../models/resultado_model.dart';
+import '../models/avaliacao_model.dart';
 import 'tela_gabarito.dart';
 import 'tela_confirmacao.dart';
 import 'tela_resultado_turma.dart';
 import 'tela_analise.dart';
 import 'tela_dashboard.dart';
-import 'tela_perfil_aluno.dart'; // 🚨 IMPORT ADICIONADO
+import 'tela_perfil_aluno.dart';
+import 'tela_cadastro_avaliacao.dart';
+import 'tela_lancamento_notas.dart';
+import 'tela_fechamento_bimestre.dart';
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -35,11 +40,107 @@ class _TelaAlunosState extends State<TelaAlunos> {
     });
   }
 
+  // 🚨 PESOS OFICIAIS DA ESCOLA (regra SAEB)
   double _pesoEscola(String nivel) {
     final n = nivel.toLowerCase();
     if (n.contains('inter')) return 1.25;
     if (n.contains('avanç')) return 0.67;
     return 1.0;
+  }
+
+  // 🚨 SÓ AVALIAÇÕES COM "SAEB" NO NOME USAM A REGRA ESPECIAL
+  bool _ehSaeb() {
+    final appState = Provider.of<AppState>(context, listen: false);
+    final nome = (appState.avaliacaoSelecionada?.nome ?? '').toLowerCase();
+    return nome.contains('saeb');
+  }
+
+  String _nivelEscola(double nota) {
+    if (nota >= 8.67) return 'Avançado';
+    if (nota >= 6.51) return 'Adequado';
+    if (nota >= 5) return 'Básico';
+    return 'Abaixo do Básico';
+  }
+
+  String _nivelNormal(double nota) {
+    if (nota >= 8) return 'Avançado';
+    if (nota >= 6) return 'Adequado';
+    if (nota >= 4) return 'Básico';
+    return 'Abaixo do Básico';
+  }
+
+  Future<void> _recarregarLista() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+    if (appState.turmaSelecionada != null) {
+      await appState.carregarAlunosDaTurma(appState.turmaSelecionada!.id);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(" Lista atualizada!"),
+            backgroundColor: Colors.indigo,
+          ),
+        );
+      }
+    }
+  }
+
+  // 🗑️ EXCLUSÃO SEGURA DE AVALIAÇÃO (com confirmação)
+  Future<void> _confirmarExclusao(Avaliacao aval) async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🗑️ Excluir avaliação'),
+        content: Text(
+          'Excluir "${aval.nome}"?\n\nTodas as notas e respostas lançadas nela serão apagadas e ela sai da média do bimestre. Essa ação não pode ser desfeita.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('EXCLUIR', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmar != true) return;
+
+    try {
+      final supabase = Supabase.instance.client;
+      // apaga na ordem certa: respostas → resultados → questões → avaliação
+      await supabase.from('respostas').delete().eq('id_avaliacao', aval.id);
+      await supabase.from('resultados').delete().eq('id_avaliacao', aval.id);
+      await supabase.from('questoes').delete().eq('id_avaliacao', aval.id);
+      await supabase.from('avaliacoes').delete().eq('id', aval.id);
+
+      final appState = Provider.of<AppState>(context, listen: false);
+      if (appState.avaliacaoSelecionada?.id == aval.id) {
+        appState.setAvaliacaoSelecionada(null);
+      }
+
+      if (mounted) {
+        Navigator.pop(context); // fecha a lista de avaliações
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🗑️ "${aval.nome}" excluída com sucesso!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro ao excluir: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _salvarCorrecaoInteligente(
@@ -88,7 +189,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
           (respostasCorretas.where((e) => e).length /
               avaliacao.gabarito.length) *
           100;
-      String nivelSaeb = Resultado.calcularNivelSaeb(notaExata);
+      // 🚨 SAEB usa cortes da escola; demais provas usam cortes clássicos
+      String nivelSaeb = _ehSaeb()
+          ? _nivelEscola(notaExata)
+          : _nivelNormal(notaExata);
       String devolutiva = "Corrigido via App Flutter 2.0. Nota: $notaExata";
 
       bool sucesso = await appState.salvarResultado(
@@ -154,6 +258,11 @@ class _TelaAlunosState extends State<TelaAlunos> {
               leading: const Icon(Icons.assignment, color: Colors.teal),
               title: Text(aval.nome),
               subtitle: Text("${aval.numeroQuestoes} questões"),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete, color: Colors.red),
+                tooltip: "Excluir avaliação",
+                onPressed: () => _confirmarExclusao(aval),
+              ),
               onTap: () async {
                 Navigator.pop(context);
                 await appState.carregarGabarito(aval.id);
@@ -287,13 +396,18 @@ class _TelaAlunosState extends State<TelaAlunos> {
             );
           }
 
+          // 🚨 CÁLCULO DA NOTA: SAEB usa pesos especiais; demais, peso igual
           double notaExataComPesos = 0.0;
           final gabarito = appState.avaliacaoSelecionada!.gabarito;
           final niveis = appState.avaliacaoSelecionada!.niveis;
+          final bool ehSaeb = _ehSaeb();
+          final double pesoNormal = gabarito.isNotEmpty
+              ? 10 / gabarito.length
+              : 1;
 
           for (int i = 0; i < respostasParaRevisar.length; i++) {
             if (i < gabarito.length && i < niveis.length) {
-              double peso = _pesoEscola(niveis[i]);
+              double peso = ehSaeb ? _pesoEscola(niveis[i]) : pesoNormal;
 
               bool respostaValida = respostasParaRevisar[i].isNotEmpty;
               bool acertou =
@@ -501,33 +615,57 @@ class _TelaAlunosState extends State<TelaAlunos> {
         elevation: 2,
         actions: [
           IconButton(
-            icon: const Icon(Icons.analytics_outlined, size: 28),
-            tooltip: "Diagnóstico SAEB",
+            icon: const Icon(Icons.summarize, size: 28),
+            tooltip: "Fechamento do Bimestre",
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const TelaResultadoTurma(),
+                builder: (context) => const TelaFechamentoBimestre(),
               ),
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.sync, size: 26),
-            tooltip: "Recarregar",
-            onPressed: () async {
-              if (appState.turmaSelecionada != null) {
-                await appState.carregarAlunosDaTurma(
-                  appState.turmaSelecionada!.id,
+            icon: const Icon(Icons.edit_note, size: 28),
+            tooltip: "Lançar Notas Manuais",
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const TelaLancamentoNotas(),
+              ),
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'cadastro') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaCadastroAvaliacao(),
+                  ),
                 );
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(" Lista atualizada!"),
-                      backgroundColor: Colors.indigo,
-                    ),
-                  );
-                }
+              } else if (value == 'saeb') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaResultadoTurma(),
+                  ),
+                );
+              } else if (value == 'sync') {
+                _recarregarLista();
               }
             },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'cadastro',
+                child: Text('➕ Cadastrar Avaliação'),
+              ),
+              const PopupMenuItem(
+                value: 'saeb',
+                child: Text('📊 Diagnóstico SAEB'),
+              ),
+              const PopupMenuItem(value: 'sync', child: Text('🔄 Recarregar')),
+            ],
           ),
         ],
       ),
@@ -882,7 +1020,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                         ],
                                       ),
 
-                                      // 🚨 CORREÇÃO: onTap apontando para TelaPerfilAluno
                                       onTap: () => Navigator.push(
                                         context,
                                         MaterialPageRoute(
