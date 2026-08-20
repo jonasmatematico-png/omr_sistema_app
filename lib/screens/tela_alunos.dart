@@ -18,6 +18,7 @@ import 'tela_perfil_aluno.dart';
 import 'tela_cadastro_avaliacao.dart';
 import 'tela_lancamento_notas.dart';
 import 'tela_fechamento_bimestre.dart';
+import 'tela_analise_pedagogica.dart';
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -653,8 +654,16 @@ class _TelaAlunosState extends State<TelaAlunos> {
                 );
               } else if (value == 'sync') {
                 _recarregarLista();
+              } else if (value == 'analise') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaAnalisePedagogica(),
+                  ),
+                );
               }
             },
+
             itemBuilder: (ctx) => [
               const PopupMenuItem(
                 value: 'cadastro',
@@ -663,6 +672,11 @@ class _TelaAlunosState extends State<TelaAlunos> {
               const PopupMenuItem(
                 value: 'saeb',
                 child: Text('📊 Diagnóstico SAEB'),
+              ),
+
+              const PopupMenuItem(
+                value: 'analise',
+                child: Text('🔎 Análise Pedagógica'),
               ),
               const PopupMenuItem(value: 'sync', child: Text('🔄 Recarregar')),
             ],
