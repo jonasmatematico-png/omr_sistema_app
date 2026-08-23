@@ -19,6 +19,8 @@ import 'tela_cadastro_avaliacao.dart';
 import 'tela_lancamento_notas.dart';
 import 'tela_fechamento_bimestre.dart';
 import 'tela_analise_pedagogica.dart';
+import 'tela_cadastro_avaliacao_aberta.dart';
+import 'tela_correcao_aberta.dart';
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -77,7 +79,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text(" Lista atualizada!"),
+            content: Text("🔄 Lista atualizada!"),
             backgroundColor: Colors.indigo,
           ),
         );
@@ -112,10 +114,13 @@ class _TelaAlunosState extends State<TelaAlunos> {
 
     try {
       final supabase = Supabase.instance.client;
-      // apaga na ordem certa: respostas → resultados → questões → avaliação
       await supabase.from('respostas').delete().eq('id_avaliacao', aval.id);
       await supabase.from('resultados').delete().eq('id_avaliacao', aval.id);
       await supabase.from('questoes').delete().eq('id_avaliacao', aval.id);
+      await supabase
+          .from('questoes_abertas')
+          .delete()
+          .eq('id_avaliacao', aval.id);
       await supabase.from('avaliacoes').delete().eq('id', aval.id);
 
       final appState = Provider.of<AppState>(context, listen: false);
@@ -124,7 +129,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
       }
 
       if (mounted) {
-        Navigator.pop(context); // fecha a lista de avaliações
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('🗑️ "${aval.nome}" excluída com sucesso!'),
@@ -190,7 +195,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
           (respostasCorretas.where((e) => e).length /
               avaliacao.gabarito.length) *
           100;
-      // 🚨 SAEB usa cortes da escola; demais provas usam cortes clássicos
       String nivelSaeb = _ehSaeb()
           ? _nivelEscola(notaExata)
           : _nivelNormal(notaExata);
@@ -397,7 +401,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
             );
           }
 
-          // 🚨 CÁLCULO DA NOTA: SAEB usa pesos especiais; demais, peso igual
           double notaExataComPesos = 0.0;
           final gabarito = appState.avaliacaoSelecionada!.gabarito;
           final niveis = appState.avaliacaoSelecionada!.niveis;
@@ -652,8 +655,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
                     builder: (context) => const TelaResultadoTurma(),
                   ),
                 );
-              } else if (value == 'sync') {
-                _recarregarLista();
               } else if (value == 'analise') {
                 Navigator.push(
                   context,
@@ -661,19 +662,41 @@ class _TelaAlunosState extends State<TelaAlunos> {
                     builder: (context) => const TelaAnalisePedagogica(),
                   ),
                 );
+              } else if (value == 'aberta') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaCadastroAvaliacaoAberta(),
+                  ),
+                );
+              } else if (value == 'corrigiraberta') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaCorrecaoAberta(),
+                  ),
+                );
+              } else if (value == 'sync') {
+                _recarregarLista();
               }
             },
-
             itemBuilder: (ctx) => [
               const PopupMenuItem(
                 value: 'cadastro',
                 child: Text('➕ Cadastrar Avaliação'),
               ),
               const PopupMenuItem(
+                value: 'aberta',
+                child: Text('📝 Cadastrar Prova Aberta'),
+              ),
+              const PopupMenuItem(
+                value: 'corrigiraberta',
+                child: Text('🤖 Corrigir Prova Aberta'),
+              ),
+              const PopupMenuItem(
                 value: 'saeb',
                 child: Text('📊 Diagnóstico SAEB'),
               ),
-
               const PopupMenuItem(
                 value: 'analise',
                 child: Text('🔎 Análise Pedagógica'),
