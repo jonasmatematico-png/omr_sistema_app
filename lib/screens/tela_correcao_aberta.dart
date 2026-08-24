@@ -110,7 +110,12 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   String _montarPrompt(List<Map<String, dynamic>> questoes) {
     final sb = StringBuffer();
     sb.writeln('Você é um professor assistente de Matemática (6º e 9º ano).');
-    sb.writeln('A imagem anexa é a prova manuscrita de um aluno.');
+    sb.writeln(
+      'As imagens anexas são a prova manuscrita de um aluno (1 ou mais folhas).',
+    );
+    sb.writeln(
+      'As questões estão NUMERADAS e podem estar em folhas diferentes — procure o número de cada questão em TODAS as folhas antes de responder.',
+    );
     sb.writeln(
       'Para cada questão: leia TUDO o que o aluno escreveu (contas e rascunhos inclusos), compare com a resposta esperada e dê crédito parcial por etapas corretas.',
     );
@@ -164,17 +169,28 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
 
       final options = DocumentScannerOptions(
         mode: ScannerMode.full,
-        pageLimit: 1,
+        pageLimit: 3,
         isGalleryImport: false,
       );
+
       final scanner = DocumentScanner(options: options);
       final result = await scanner.scanDocument();
       if (result.images == null || result.images!.isEmpty) {
         setState(() => processando = false);
         return;
       }
-      final bytes = await File(result.images!.first).readAsBytes();
 
+      // 🚨 MULTI-FOLHAS: lê todas as folhas escaneadas
+      final List<Map<String, dynamic>> partesImagem = [];
+      for (final caminho in result.images!) {
+        final bytesPagina = await File(caminho).readAsBytes();
+        partesImagem.add({
+          'inline_data': {
+            'mime_type': 'image/jpeg',
+            'data': base64Encode(bytesPagina),
+          },
+        });
+      }
       final qs = await supabase
           .from('questoes_abertas')
           .select('*')
@@ -195,12 +211,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
                 {
                   'parts': [
                     {'text': _montarPrompt(questoes)},
-                    {
-                      'inline_data': {
-                        'mime_type': 'image/jpeg',
-                        'data': base64Encode(bytes),
-                      },
-                    },
+                    ...partesImagem,
                   ],
                 },
               ],
