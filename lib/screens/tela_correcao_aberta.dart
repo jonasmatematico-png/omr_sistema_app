@@ -1,10 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
+//#import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+
+//import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class TelaCorrecaoAberta extends StatefulWidget {
   const TelaCorrecaoAberta({super.key});
@@ -14,6 +17,7 @@ class TelaCorrecaoAberta extends StatefulWidget {
 }
 
 class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
+  // 🚨 TROQUE AQUI se o Google mudar o nome do modelo
   static const String _modeloGemini = 'gemini-3.6-flash';
 
   String _apiKey = '';
@@ -27,6 +31,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   bool carregando = true;
   bool processando = false;
 
+  // modo revisão
   bool emRevisao = false;
   String _nomeAlunoRevisao = '';
   int? _idAlunoRevisao;
@@ -167,12 +172,12 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     try {
       final supabase = Supabase.instance.client;
 
+      // 1) Fotografa a prova (até 3 folhas)
       final options = DocumentScannerOptions(
         mode: ScannerMode.full,
         pageLimit: 3,
         isGalleryImport: false,
       );
-
       final scanner = DocumentScanner(options: options);
       final result = await scanner.scanDocument();
       if (result.images == null || result.images!.isEmpty) {
@@ -180,7 +185,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         return;
       }
 
-      // 🚨 MULTI-FOLHAS: lê todas as folhas escaneadas
+      // 2) Lê as folhas escaneadas (sem compressão = mais rápido no celular)
       final List<Map<String, dynamic>> partesImagem = [];
       for (final caminho in result.images!) {
         final bytesPagina = await File(caminho).readAsBytes();
@@ -191,37 +196,58 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
           },
         });
       }
+
+      // 3) Busca as questões abertas da avaliação
       final qs = await supabase
           .from('questoes_abertas')
           .select('*')
           .eq('id_avaliacao', avalId!)
           .order('numero');
       final questoes = List<Map<String, dynamic>>.from(qs);
-      if (questoes.isEmpty)
+      if (questoes.isEmpty) {
         throw Exception('Esta prova aberta não tem questões cadastradas.');
+      }
 
-      final response = await http
-          .post(
-            Uri.parse(
-              'https://generativelanguage.googleapis.com/v1beta/models/$_modeloGemini:generateContent?key=$_apiKey',
-            ),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {
-                  'parts': [
-                    {'text': _montarPrompt(questoes)},
-                    ...partesImagem,
-                  ],
-                },
-              ],
-              'generationConfig': {
-                'temperature': 0.2,
-                'responseMimeType': 'application/json',
-              },
-            }),
-          )
-          .timeout(const Duration(seconds: 120));
+      final corpo = jsonEncode({
+        'contents': [
+          {
+            'parts': [
+              {'text': _montarPrompt(questoes)},
+              ...partesImagem,
+            ],
+          },
+        ],
+        'generationConfig': {
+          'temperature': 0.2,
+          'responseMimeType': 'application/json',
+        },
+      });
+
+      // 4) 🚨 RETENTATIVAS: se a internet cair, o app tenta 3 vezes sozinho
+      http.Response? response;
+      String? ultimoErro;
+      for (int tentativa = 1; tentativa <= 3; tentativa++) {
+        try {
+          response = await http
+              .post(
+                Uri.parse(
+                  'https://generativelanguage.googleapis.com/v1beta/models/$_modeloGemini:generateContent?key=$_apiKey',
+                ),
+                headers: {'Content-Type': 'application/json'},
+                body: corpo,
+              )
+              .timeout(const Duration(seconds: 120));
+          break;
+        } catch (e) {
+          ultimoErro = '$e';
+          if (tentativa < 3) {
+            await Future.delayed(Duration(seconds: 2 * tentativa));
+          }
+        }
+      }
+      if (response == null) {
+        throw Exception('Falha de conexão após 3 tentativas: $ultimoErro');
+      }
 
       if (response.statusCode != 200) {
         throw Exception(
@@ -234,6 +260,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
           json['candidates'][0]['content']['parts'][0]['text'] as String;
       final sugestoes = _parseJson(texto);
 
+      // 5) Prepara a revisão
       for (final c in _notaControllers.values) {
         c.dispose();
       }
@@ -331,6 +358,8 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     }
   }
 
+  // ---------- PARTES DA TELA ----------
+
   Widget _buildChavePanel() {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -353,7 +382,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
                       controller: _keyController,
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
-                        hintText: 'AIza...',
+                        hintText: 'AQ... ou AIza...',
                       ),
                     ),
                   ),
@@ -595,6 +624,37 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     );
   }
 
+  Widget _buildOverlayProcessando() {
+    return Container(
+      color: Colors.black.withOpacity(0.6),
+      child: const Center(
+        child: Card(
+          color: Colors.white,
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: Colors.deepOrange),
+                SizedBox(height: 16),
+                Text(
+                  '🤖 A IA está lendo a prova...',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Isso pode levar até 1 minuto.\nNão feche o app!',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -603,18 +663,23 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
       ),
-      body: carregando
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                if (_apiKey.isEmpty) _buildChavePanel(),
-                if (!emRevisao) _buildSelecaoProvaETurma(),
-                if (!emRevisao) Expanded(child: _buildListaAlunos()),
-                if (emRevisao) _buildRevisaoHeader(),
-                if (emRevisao) Expanded(child: _buildRevisaoLista()),
-                if (emRevisao) _buildBotaoConfirmar(),
-              ],
-            ),
+      body: Stack(
+        children: [
+          carregando
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  children: [
+                    if (_apiKey.isEmpty) _buildChavePanel(),
+                    if (!emRevisao) _buildSelecaoProvaETurma(),
+                    if (!emRevisao) Expanded(child: _buildListaAlunos()),
+                    if (emRevisao) _buildRevisaoHeader(),
+                    if (emRevisao) Expanded(child: _buildRevisaoLista()),
+                    if (emRevisao) _buildBotaoConfirmar(),
+                  ],
+                ),
+          if (processando) _buildOverlayProcessando(),
+        ],
+      ),
       floatingActionButton: emRevisao
           ? FloatingActionButton.extended(
               onPressed: () => setState(() => emRevisao = false),
