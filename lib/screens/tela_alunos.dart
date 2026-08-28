@@ -7,12 +7,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
 import '../context/app_state.dart';
 import '../models/aluno_model.dart';
-import '../models/resultado_model.dart';
 import '../models/avaliacao_model.dart';
 import 'tela_gabarito.dart';
 import 'tela_confirmacao.dart';
 import 'tela_resultado_turma.dart';
-import 'tela_analise.dart';
 import 'tela_dashboard.dart';
 import 'tela_perfil_aluno.dart';
 import 'tela_cadastro_avaliacao.dart';
@@ -21,6 +19,7 @@ import 'tela_fechamento_bimestre.dart';
 import 'tela_analise_pedagogica.dart';
 import 'tela_cadastro_avaliacao_aberta.dart';
 import 'tela_correcao_aberta.dart';
+import 'tela_teste_ias.dart';
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -43,7 +42,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
     });
   }
 
-  // 🚨 PESOS OFICIAIS DA ESCOLA (regra SAEB)
   double _pesoEscola(String nivel) {
     final n = nivel.toLowerCase();
     if (n.contains('inter')) return 1.25;
@@ -51,7 +49,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
     return 1.0;
   }
 
-  // 🚨 SÓ AVALIAÇÕES COM "SAEB" NO NOME USAM A REGRA ESPECIAL
   bool _ehSaeb() {
     final appState = Provider.of<AppState>(context, listen: false);
     final nome = (appState.avaliacaoSelecionada?.nome ?? '').toLowerCase();
@@ -87,7 +84,6 @@ class _TelaAlunosState extends State<TelaAlunos> {
     }
   }
 
-  // 🗑️ EXCLUSÃO SEGURA DE AVALIAÇÃO (com confirmação)
   Future<void> _confirmarExclusao(Avaliacao aval) async {
     final confirmar = await showDialog<bool>(
       context: context,
@@ -447,7 +443,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
                   fotoRecortada: fotoRecortada,
                   nomeAluno: alunoAlvo.nome,
                   respostasDetectadas: respostasParaRevisar,
-                  onConfirmar: (notaConfirmada, respostasConfirmadas) {
+                  onConfirmar: (_, respostasConfirmadas) {
                     setState(() {
                       alunoAlvo.status = "Corrigido";
                       alunoAlvo.notaFinal = (notaExataComPesos + 0.5).toInt();
@@ -676,6 +672,11 @@ class _TelaAlunosState extends State<TelaAlunos> {
                     builder: (context) => const TelaCorrecaoAberta(),
                   ),
                 );
+              } else if (value == 'lab') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TelaTesteIAs()),
+                );
               } else if (value == 'sync') {
                 _recarregarLista();
               }
@@ -700,6 +701,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
               const PopupMenuItem(
                 value: 'analise',
                 child: Text('🔎 Análise Pedagógica'),
+              ),
+              const PopupMenuItem(
+                value: 'lab',
+                child: Text('🧪 Laboratório de IAs'),
               ),
               const PopupMenuItem(value: 'sync', child: Text('🔄 Recarregar')),
             ],

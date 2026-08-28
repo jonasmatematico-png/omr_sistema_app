@@ -1,13 +1,10 @@
 import 'dart:convert';
 import 'dart:io';
-//#import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
-
-//import 'package:flutter_image_compress/flutter_image_compress.dart';
 
 class TelaCorrecaoAberta extends StatefulWidget {
   const TelaCorrecaoAberta({super.key});
@@ -19,9 +16,20 @@ class TelaCorrecaoAberta extends StatefulWidget {
 class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   // 🚨 TROQUE AQUI se o Google mudar o nome do modelo
   static const String _modeloGemini = 'gemini-3.6-flash';
+  // ⚡ GROQ: modelo com visão (troque se o Groq aposentar)
+  static const String _modeloGroq = 'meta-llama/llama-4-scout-17b-16e-instruct';
 
-  String _apiKey = '';
+  // 🚨 PROVEDOR DE IA (gemini | groq)
+  String _provedor = 'gemini';
+
+  // 🚨 TIME DE CHAVES Gemini (rotação automática)
+  List<String> _chaves = [];
+  int _chaveAtiva = 0;
   final _keyController = TextEditingController();
+
+  // ⚡ Chave do Groq (modo teste)
+  String _groqKey = '';
+  final _groqKeyController = TextEditingController();
 
   List<Map<String, dynamic>> avaliacoesAbertas = [];
   List<Map<String, dynamic>> turmas = [];
@@ -39,6 +47,9 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   List<Map<String, dynamic>> _sugestoes = [];
   final Map<int, TextEditingController> _notaControllers = {};
 
+  // guarda as últimas fotos para o botão RECORRIGIR
+  List<String> _ultimosCaminhos = [];
+
   @override
   void initState() {
     super.initState();
@@ -48,7 +59,21 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   Future<void> _carregarTudo() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final chave = prefs.getString('gemini_api_key') ?? '';
+
+      // ⚡ Carrega provedor e chave Groq
+      final provedor = prefs.getString('provedor_ia') ?? 'gemini';
+      final groqKey = prefs.getString('groq_api_key') ?? '';
+
+      // 🚨 Carrega o time de chaves (e migra a chave antiga, se existir)
+      List<String> chaves = prefs.getStringList('gemini_api_keys') ?? [];
+      if (chaves.isEmpty) {
+        final antiga = prefs.getString('gemini_api_key') ?? '';
+        if (antiga.isNotEmpty) {
+          chaves = [antiga];
+          await prefs.setStringList('gemini_api_keys', chaves);
+        }
+      }
+
       final supabase = Supabase.instance.client;
       final a = await supabase.from('avaliacoes').select('*').order('id');
       final t = await supabase.from('turmas').select('*').order('nome');
@@ -60,7 +85,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       listaTurmas.sort((x, y) => '${x['nome']}'.compareTo('${y['nome']}'));
 
       setState(() {
-        _apiKey = chave;
+        _provedor = provedor;
+        _groqKey = groqKey;
+        _chaves = chaves;
+        _chaveAtiva = 0;
         avaliacoesAbertas = abertas;
         turmas = listaTurmas;
         carregando = false;
@@ -70,12 +98,18 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     }
   }
 
+  // ---------- GERENCIAMENTO DE CHAVES ----------
+
   Future<void> _salvarChave() async {
     final k = _keyController.text.trim();
     if (k.isEmpty) return;
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('gemini_api_key', k);
-    setState(() => _apiKey = k);
+    setState(() {
+      _chaves.add(k);
+      _chaveAtiva = 0;
+    });
+    await prefs.setStringList('gemini_api_keys', _chaves);
+    _keyController.clear();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -85,6 +119,171 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       );
     }
   }
+
+  Future<void> _salvarChaveGroq() async {
+    final k = _groqKeyController.text.trim();
+    if (k.isEmpty) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('groq_api_key', k);
+    setState(() => _groqKey = k);
+    _groqKeyController.clear();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚡ Chave Groq salva!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  Future<void> _trocarProvedor(String p) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('provedor_ia', p);
+    setState(() => _provedor = p);
+  }
+
+  Future<void> _gerenciarChaves() async {
+    final novoController = TextEditingController();
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSheetState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
+          child: Container(
+            height: MediaQuery.of(ctx).size.height * 0.6,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                const Text(
+                  '🔑 Chaves da IA',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+                const Text(
+                  'Cada chave = 20 correções/dia.\nO app troca sozinho quando a cota acabar.',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: _chaves.isEmpty
+                      ? const Center(child: Text('Nenhuma chave cadastrada.'))
+                      : ListView.builder(
+                          itemCount: _chaves.length,
+                          itemBuilder: (context, i) {
+                            final c = _chaves[i];
+                            final mascara = c.length > 10
+                                ? '${c.substring(0, 10)}...'
+                                : c;
+                            return ListTile(
+                              leading: CircleAvatar(
+                                backgroundColor: i == _chaveAtiva
+                                    ? Colors.deepOrange
+                                    : Colors.grey.shade300,
+                                child: Text(
+                                  '${i + 1}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              title: Text(
+                                mascara,
+                                style: const TextStyle(
+                                  fontFamily: 'monospace',
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: i == _chaveAtiva
+                                  ? const Text(
+                                      'Chave ativa',
+                                      style: TextStyle(fontSize: 11),
+                                    )
+                                  : null,
+                              trailing: IconButton(
+                                icon: const Icon(
+                                  Icons.delete,
+                                  color: Colors.red,
+                                ),
+                                onPressed: () async {
+                                  final prefs =
+                                      await SharedPreferences.getInstance();
+                                  setSheetState(() {
+                                    _chaves.removeAt(i);
+                                    if (_chaveAtiva >= _chaves.length)
+                                      _chaveAtiva = 0;
+                                  });
+                                  setState(() {});
+                                  await prefs.setStringList(
+                                    'gemini_api_keys',
+                                    _chaves,
+                                  );
+                                },
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: novoController,
+                        decoration: const InputDecoration(
+                          border: OutlineInputBorder(),
+                          hintText: 'Cole a nova chave (AQ... ou AIza...)',
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () async {
+                        final k = novoController.text.trim();
+                        if (k.isEmpty) return;
+                        if (_chaves.contains(k)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('⚠️ Esta chave já está na lista.'),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                          return;
+                        }
+                        final prefs = await SharedPreferences.getInstance();
+                        setSheetState(() => _chaves.add(k));
+                        setState(() {});
+                        await prefs.setStringList('gemini_api_keys', _chaves);
+                        novoController.clear();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              '🔑 Chave ${_chaves.length} adicionada!',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      },
+                      child: const Text('Adicionar'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------- DADOS ----------
 
   Future<void> _carregarAlunos() async {
     if (turmaId == null) return;
@@ -156,12 +355,200 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     return arr.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
+  // 🚨 CHAMA A IA (com rotação de chaves no Gemini)
+  Future<List<Map<String, dynamic>>> _chamarIA(
+    List<String> caminhos,
+    List<Map<String, dynamic>> questoes,
+  ) async {
+    // ⚡ GROQ: caminho próprio
+    if (_provedor == 'groq') {
+      return _chamarGroq(caminhos, questoes);
+    }
+    if (_chaves.isEmpty) {
+      throw Exception('Cadastre ao menos uma chave da IA.');
+    }
+
+    final List<Map<String, dynamic>> partesImagem = [];
+    for (final caminho in caminhos) {
+      final bytesPagina = await File(caminho).readAsBytes();
+      partesImagem.add({
+        'inline_data': {
+          'mime_type': 'image/jpeg',
+          'data': base64Encode(bytesPagina),
+        },
+      });
+    }
+
+    final corpo = jsonEncode({
+      'contents': [
+        {
+          'parts': [
+            {'text': _montarPrompt(questoes)},
+            ...partesImagem,
+          ],
+        },
+      ],
+      'generationConfig': {
+        'temperature': 0.2,
+        'responseMimeType': 'application/json',
+      },
+    });
+
+    Object? ultimoErro;
+
+    // 🚨 ROTAÇÃO: tenta cada chave do time; 429 pula para a próxima
+    for (int k = 0; k < _chaves.length; k++) {
+      final indice = (_chaveAtiva + k) % _chaves.length;
+      final chave = _chaves[indice];
+      final proxima = (_chaveAtiva + k + 1) % _chaves.length;
+      bool trocarChave = false;
+
+      for (int tentativa = 1; tentativa <= 2; tentativa++) {
+        try {
+          final response = await http
+              .post(
+                Uri.parse(
+                  'https://generativelanguage.googleapis.com/v1beta/models/$_modeloGemini:generateContent?key=$chave',
+                ),
+                headers: {'Content-Type': 'application/json'},
+                body: corpo,
+              )
+              .timeout(const Duration(seconds: 120));
+
+          if (response.statusCode == 429) {
+            ultimoErro = 'Chave ${indice + 1} sem cota (429).';
+            trocarChave = true;
+            break;
+          }
+          if (response.statusCode != 200) {
+            throw Exception(
+              'IA respondeu ${response.statusCode}: ${response.body}',
+            );
+          }
+
+          if (_chaveAtiva != indice && mounted) {
+            setState(() => _chaveAtiva = indice);
+          }
+          final json = jsonDecode(response.body);
+          final texto =
+              json['candidates'][0]['content']['parts'][0]['text'] as String;
+          return _parseJson(texto);
+        } catch (e) {
+          ultimoErro = e;
+          if (tentativa < 2) {
+            await Future.delayed(Duration(seconds: 2 * tentativa));
+          }
+        }
+      }
+
+      if (trocarChave && mounted && k < _chaves.length - 1) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🔑 Cota da chave ${indice + 1} esgotada — usando a chave ${proxima + 1}...',
+            ),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    }
+
+    throw Exception('Todas as chaves falharam: $ultimoErro');
+  }
+
+  // ⚡ CHAMA O GROQ (teste de velocidade)
+  Future<List<Map<String, dynamic>>> _chamarGroq(
+    List<String> caminhos,
+    List<Map<String, dynamic>> questoes,
+  ) async {
+    if (_groqKey.isEmpty) {
+      throw Exception('Cole sua chave do Groq primeiro.');
+    }
+
+    final List<Map<String, dynamic>> conteudo = [
+      {'type': 'text', 'text': _montarPrompt(questoes)},
+    ];
+    for (final caminho in caminhos) {
+      final bytes = await File(caminho).readAsBytes();
+      conteudo.add({
+        'type': 'image_url',
+        'image_url': {'url': 'data:image/jpeg;base64,${base64Encode(bytes)}'},
+      });
+    }
+
+    final corpo = jsonEncode({
+      'model': _modeloGroq,
+      'messages': [
+        {'role': 'user', 'content': conteudo},
+      ],
+      'temperature': 0.2,
+    });
+
+    http.Response? response;
+    Object? ultimoErro;
+    for (int tentativa = 1; tentativa <= 2; tentativa++) {
+      try {
+        response = await http
+            .post(
+              Uri.parse('https://api.groq.com/openai/v1/chat/completions'),
+              headers: {
+                'Authorization': 'Bearer $_groqKey',
+                'Content-Type': 'application/json',
+              },
+              body: corpo,
+            )
+            .timeout(const Duration(seconds: 120));
+        break;
+      } catch (e) {
+        ultimoErro = e;
+        if (tentativa < 2) {
+          await Future.delayed(Duration(seconds: 2 * tentativa));
+        }
+      }
+    }
+    if (response == null)
+      throw Exception('Falha de conexão com o Groq: $ultimoErro');
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Groq respondeu ${response.statusCode}: ${response.body}',
+      );
+    }
+
+    final json = jsonDecode(response.body);
+    final texto = json['choices'][0]['message']['content'] as String;
+    return _parseJson(texto);
+  }
+
+  Future<void> _prepararRevisao(
+    List<Map<String, dynamic>> questoes,
+    List<Map<String, dynamic>> sugestoes,
+  ) async {
+    for (final c in _notaControllers.values) {
+      c.dispose();
+    }
+    _notaControllers.clear();
+    for (final s in sugestoes) {
+      final n = (s['numero'] as num?)?.toInt() ?? 0;
+      final nota = (s['nota_sugerida'] as num?)?.toDouble() ?? 0;
+      _notaControllers[n] = TextEditingController(
+        text: nota.toString().replaceAll('.', ','),
+      );
+    }
+    setState(() {
+      _questoesRevisao = questoes;
+      _sugestoes = sugestoes;
+      emRevisao = true;
+      processando = false;
+    });
+  }
+
   Future<void> _corrigirAluno(Map<String, dynamic> aluno) async {
-    if (_apiKey.isEmpty) {
+    final semChave = _provedor == 'groq' ? _groqKey.isEmpty : _chaves.isEmpty;
+    if (semChave) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('🔑 Cole sua chave da IA no campo do topo!'),
+            content: Text('🔑 Cadastre a chave da IA no topo!'),
             backgroundColor: Colors.orange,
           ),
         );
@@ -172,11 +559,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     try {
       final supabase = Supabase.instance.client;
 
-      // 1) Fotografa a prova (até 3 folhas)
       final options = DocumentScannerOptions(
         mode: ScannerMode.full,
         pageLimit: 3,
-        isGalleryImport: false,
+        isGalleryImport: true,
       );
       final scanner = DocumentScanner(options: options);
       final result = await scanner.scanDocument();
@@ -185,19 +571,8 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         return;
       }
 
-      // 2) Lê as folhas escaneadas (sem compressão = mais rápido no celular)
-      final List<Map<String, dynamic>> partesImagem = [];
-      for (final caminho in result.images!) {
-        final bytesPagina = await File(caminho).readAsBytes();
-        partesImagem.add({
-          'inline_data': {
-            'mime_type': 'image/jpeg',
-            'data': base64Encode(bytesPagina),
-          },
-        });
-      }
+      _ultimosCaminhos = List<String>.from(result.images!);
 
-      // 3) Busca as questões abertas da avaliação
       final qs = await supabase
           .from('questoes_abertas')
           .select('*')
@@ -208,79 +583,13 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         throw Exception('Esta prova aberta não tem questões cadastradas.');
       }
 
-      final corpo = jsonEncode({
-        'contents': [
-          {
-            'parts': [
-              {'text': _montarPrompt(questoes)},
-              ...partesImagem,
-            ],
-          },
-        ],
-        'generationConfig': {
-          'temperature': 0.2,
-          'responseMimeType': 'application/json',
-        },
-      });
-
-      // 4) 🚨 RETENTATIVAS: se a internet cair, o app tenta 3 vezes sozinho
-      http.Response? response;
-      String? ultimoErro;
-      for (int tentativa = 1; tentativa <= 3; tentativa++) {
-        try {
-          response = await http
-              .post(
-                Uri.parse(
-                  'https://generativelanguage.googleapis.com/v1beta/models/$_modeloGemini:generateContent?key=$_apiKey',
-                ),
-                headers: {'Content-Type': 'application/json'},
-                body: corpo,
-              )
-              .timeout(const Duration(seconds: 120));
-          break;
-        } catch (e) {
-          ultimoErro = '$e';
-          if (tentativa < 3) {
-            await Future.delayed(Duration(seconds: 2 * tentativa));
-          }
-        }
-      }
-      if (response == null) {
-        throw Exception('Falha de conexão após 3 tentativas: $ultimoErro');
-      }
-
-      if (response.statusCode != 200) {
-        throw Exception(
-          'IA respondeu ${response.statusCode}: ${response.body}',
-        );
-      }
-
-      final json = jsonDecode(response.body);
-      final texto =
-          json['candidates'][0]['content']['parts'][0]['text'] as String;
-      final sugestoes = _parseJson(texto);
-
-      // 5) Prepara a revisão
-      for (final c in _notaControllers.values) {
-        c.dispose();
-      }
-      _notaControllers.clear();
-      for (final s in sugestoes) {
-        final n = (s['numero'] as num?)?.toInt() ?? 0;
-        final nota = (s['nota_sugerida'] as num?)?.toDouble() ?? 0;
-        _notaControllers[n] = TextEditingController(
-          text: nota.toString().replaceAll('.', ','),
-        );
-      }
+      final sugestoes = await _chamarIA(_ultimosCaminhos, questoes);
 
       setState(() {
-        _questoesRevisao = questoes;
-        _sugestoes = sugestoes;
         _nomeAlunoRevisao = '${aluno['nome_completo']}';
         _idAlunoRevisao = aluno['id'] as int;
-        emRevisao = true;
-        processando = false;
       });
+      await _prepararRevisao(questoes, sugestoes);
     } catch (e) {
       setState(() => processando = false);
       if (mounted) {
@@ -289,6 +598,230 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         );
       }
     }
+  }
+
+  Future<void> _recorrigir() async {
+    if (_ultimosCaminhos.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Nenhuma foto guardada. Use Refotografar.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    setState(() => processando = true);
+    try {
+      final supabase = Supabase.instance.client;
+      final qs = await supabase
+          .from('questoes_abertas')
+          .select('*')
+          .eq('id_avaliacao', avalId!)
+          .order('numero');
+      final questoes = List<Map<String, dynamic>>.from(qs);
+      final sugestoes = await _chamarIA(_ultimosCaminhos, questoes);
+      await _prepararRevisao(questoes, sugestoes);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('🔄 Correção atualizada com as regras atuais!'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      setState(() => processando = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _refotografar() {
+    final aluno = <String, dynamic>{
+      'id': _idAlunoRevisao,
+      'nome_completo': _nomeAlunoRevisao,
+    };
+    setState(() => emRevisao = false);
+    _corrigirAluno(aluno);
+  }
+
+  Future<void> _editarRegras() async {
+    if (avalId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Escolha a prova aberta primeiro!'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+    final supabase = Supabase.instance.client;
+    final qs = await supabase
+        .from('questoes_abertas')
+        .select('*')
+        .eq('id_avaliacao', avalId!)
+        .order('numero');
+    final questoes = List<Map<String, dynamic>>.from(qs);
+    if (questoes.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ Esta prova não tem questões.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+      return;
+    }
+
+    final Map<int, TextEditingController> respCtl = {};
+    final Map<int, TextEditingController> valCtl = {};
+    for (final q in questoes) {
+      respCtl[q['id'] as int] = TextEditingController(
+        text: '${q['resposta_esperada']}',
+      );
+      valCtl[q['id'] as int] = TextEditingController(
+        text: '${q['valor']}'.replaceAll('.', ','),
+      );
+    }
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          height: MediaQuery.of(ctx).size.height * 0.8,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                '✏️ Regras da prova',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Ajuste os critérios e valores. Vale para as próximas correções!',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 8),
+              Expanded(
+                child: ListView(
+                  children: [
+                    for (final q in questoes)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Questão ${q['numero']}: ${q['enunciado']}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: respCtl[q['id'] as int],
+                                maxLines: 2,
+                                decoration: const InputDecoration(
+                                  labelText: 'Resposta esperada / critério',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: valCtl[q['id'] as int],
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                      decimal: true,
+                                    ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Valor da questão',
+                                  border: OutlineInputBorder(),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      for (final q in questoes) {
+                        final id = q['id'] as int;
+                        await supabase
+                            .from('questoes_abertas')
+                            .update({
+                              'resposta_esperada': respCtl[id]!.text.trim(),
+                              'valor':
+                                  double.tryParse(
+                                    valCtl[id]!.text.trim().replaceAll(
+                                      ',',
+                                      '.',
+                                    ),
+                                  ) ??
+                                  (q['valor'] as num).toDouble(),
+                            })
+                            .eq('id', id);
+                      }
+                      if (mounted) {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                              '✅ Regras atualizadas! Use 🔄 Recorrigir para aplicar nesta prova.',
+                            ),
+                            backgroundColor: Colors.green,
+                          ),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('❌ $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.save),
+                  label: const Text(
+                    'SALVAR REGRAS',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   String _nivelNormal(double nota) {
@@ -360,6 +893,91 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
 
   // ---------- PARTES DA TELA ----------
 
+  Widget _buildSeletorProvedor() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _trocarProvedor('gemini'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _provedor == 'gemini'
+                    ? Colors.deepOrange
+                    : Colors.grey.shade200,
+                foregroundColor: _provedor == 'gemini'
+                    ? Colors.white
+                    : Colors.grey.shade700,
+              ),
+              child: const Text(
+                '🟠 Gemini',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () => _trocarProvedor('groq'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _provedor == 'groq'
+                    ? Colors.blue
+                    : Colors.grey.shade200,
+                foregroundColor: _provedor == 'groq'
+                    ? Colors.white
+                    : Colors.grey.shade700,
+              ),
+              child: const Text(
+                '⚡ Groq',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPainelGroq() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        color: Colors.blue.shade50,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '⚡ Cole sua chave do Groq (console.groq.com/keys):',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _groqKeyController,
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                        hintText: 'gsk_...',
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _salvarChaveGroq,
+                    child: const Text('Salvar'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildChavePanel() {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -396,6 +1014,27 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildChavesResumo() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          const Icon(Icons.vpn_key, size: 16, color: Colors.deepOrange),
+          const SizedBox(width: 6),
+          Text(
+            '🔑 ${_chaves.length} chave(s) • ativa: ${_chaveAtiva + 1}',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+          ),
+          const Spacer(),
+          TextButton(
+            onPressed: _gerenciarChaves,
+            child: const Text('Gerenciar', style: TextStyle(fontSize: 12)),
+          ),
+        ],
       ),
     );
   }
@@ -441,6 +1080,16 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
               _carregarAlunos();
             },
           ),
+          if (avalId != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _editarRegras,
+                icon: const Icon(Icons.edit, size: 18),
+                label: const Text('✏️ Regras da prova'),
+                style: TextButton.styleFrom(foregroundColor: Colors.deepOrange),
+              ),
+            ),
         ],
       ),
     );
@@ -602,6 +1251,53 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     );
   }
 
+  Widget _buildBotoesAcao() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _editarRegras,
+              icon: const Icon(Icons.edit, size: 18),
+              label: const Text('Regras', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.deepOrange,
+                side: BorderSide(color: Colors.deepOrange.shade300),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _recorrigir,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Recorrigir', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _refotografar,
+              icon: const Icon(Icons.camera_alt, size: 18),
+              label: const Text('Foto', style: TextStyle(fontSize: 12)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.deepOrange,
+                side: BorderSide(color: Colors.deepOrange.shade300),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBotaoConfirmar() {
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -669,11 +1365,33 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
               ? const Center(child: CircularProgressIndicator())
               : Column(
                   children: [
-                    if (_apiKey.isEmpty) _buildChavePanel(),
+                    if (!emRevisao) _buildSeletorProvedor(),
+                    if (_provedor == 'gemini' && _chaves.isEmpty)
+                      _buildChavePanel(),
+                    if (_provedor == 'groq' && _groqKey.isEmpty)
+                      _buildPainelGroq(),
+                    if (_provedor == 'gemini' &&
+                        _chaves.isNotEmpty &&
+                        !emRevisao)
+                      _buildChavesResumo(),
+                    if (_provedor == 'groq' &&
+                        _groqKey.isNotEmpty &&
+                        !emRevisao)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            '⚡ Groq ativo — modo teste de velocidade!',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ),
+                      ),
                     if (!emRevisao) _buildSelecaoProvaETurma(),
                     if (!emRevisao) Expanded(child: _buildListaAlunos()),
                     if (emRevisao) _buildRevisaoHeader(),
                     if (emRevisao) Expanded(child: _buildRevisaoLista()),
+                    if (emRevisao) _buildBotoesAcao(),
                     if (emRevisao) _buildBotaoConfirmar(),
                   ],
                 ),
