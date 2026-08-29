@@ -1,46 +1,606 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-BR">
 <head>
-  <!--
-    If you are serving your web app in a path other than the root, change the
-    href value below to reflect the base path you are serving from.
-
-    The path provided below has to start and end with a slash "/" in order for
-    it to work correctly.
-
-    For more details:
-    * https://developer.mozilla.org/en-US/docs/Web/HTML/Element/base
-
-    This is a placeholder for base href that will be replaced by the value of
-    the `--base-href` argument provided to `flutter build`.
-  -->
-  <base href="$FLUTTER_BASE_HREF">
-
   <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
-
-  <!-- iOS meta tags & icons -->
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="omr_sistema_app">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="favicon.png"/>
-
-  <title>omr_sistema_app</title>
-  <link rel="manifest" href="manifest.json">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Provas Abertas • OMR Sistema</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+      color: #333;
+      min-height: 100vh;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+    .header {
+      background: #008080;
+      color: white;
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .header h1 { font-size: 20px; font-weight: 600; }
+    .header .user-info { display: flex; gap: 12px; align-items: center; font-size: 13px; }
+    .btn {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .btn-primary { background: #008080; color: white; }
+    .btn-primary:hover { background: #006666; }
+    .btn-secondary { background: #ff6b35; color: white; }
+    .btn-secondary:hover { background: #e55a2b; }
+    .btn-ghost { background: transparent; color: white; border: 1px solid white; }
+    .btn-ghost:hover { background: rgba(255,255,255,0.1); }
+    .btn-danger { background: #dc3545; color: white; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .card {
+      background: white;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-weight: 500; font-size: 13px; color: #555; }
+    .form-group input, .form-group textarea, .form-group select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+    }
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+      outline: none;
+      border-color: #008080;
+      box-shadow: 0 0 0 3px rgba(0,128,128,0.1);
+    }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) { .form-row { grid-template-columns: 1fr; } }
+    .questao-card {
+      background: #f8f9fa;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 16px;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .questao-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .questao-num {
+      background: #008080;
+      color: white;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    .remove-btn {
+      background: transparent;
+      color: #dc3545;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 4px 8px;
+    }
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal.active { display: flex; }
+    .modal-content {
+      background: white;
+      border-radius: 8px;
+      padding: 24px;
+      max-width: 600px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 12px 20px;
+      border-radius: 6px;
+      color: white;
+      font-size: 14px;
+      z-index: 2000;
+      animation: slideIn 0.3s ease;
+      max-width: 400px;
+    }
+    .toast.success { background: #28a745; }
+    .toast.error { background: #dc3545; }
+    .toast.info { background: #17a2b8; }
+    @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
+    .auth-container {
+      max-width: 400px;
+      margin: 80px auto;
+      padding: 32px;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .auth-container h2 { text-align: center; color: #008080; margin-bottom: 24px; }
+    .auth-tabs { display: flex; margin-bottom: 20px; border-bottom: 1px solid #ddd; }
+    .auth-tab {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-weight: 500;
+      color: #666;
+    }
+    .auth-tab.active { color: #008080; border-bottom: 2px solid #008080; }
+    .hidden { display: none !important; }
+    .provas-lista { margin-top: 24px; }
+    .prova-item {
+      background: white;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .prova-item-info strong { color: #008080; }
+    .prova-item-meta { font-size: 12px; color: #666; margin-top: 2px; }
+    .section-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #008080;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e0e0e0;
+    }
+    .loading { text-align: center; padding: 40px; color: #666; }
+    .help-text { font-size: 11px; color: #888; margin-top: 4px; }
+  </style>
 </head>
 <body>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
 
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
+<!-- TELA DE LOGIN -->
+<div id="authScreen" class="container">
+  <div class="auth-container">
+    <h2>📝 Provas Abertas</h2>
+    <div class="auth-tabs">
+      <button class="auth-tab active" onclick="trocarTab('login')">Entrar</button>
+      <button class="auth-tab" onclick="trocarTab('signup')">Criar conta</button>
+    </div>
+    
+    <div id="loginForm">
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="loginEmail" placeholder="seu@email.com">
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="loginPassword" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary" style="width: 100%;" onclick="fazerLogin()">Entrar</button>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="signupEmail" placeholder="seu@email.com">
+      </div>
+      <div class="form-group">
+        <label>Senha (mínimo 6 caracteres)</label>
+        <input type="password" id="signupPassword" placeholder="••••••••">
+      </div>
+      <button class="btn btn-secondary" style="width: 100%;" onclick="criarConta()">Criar conta</button>
+      <p class="help-text" style="margin-top: 12px; text-align: center;">
+        Após criar, você pode precisar confirmar o e-mail (verifique sua caixa de entrada).
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- TELA PRINCIPAL -->
+<div id="mainScreen" class="hidden">
+  <div class="header">
+    <h1>📝 Cadastrar Prova Aberta</h1>
+    <div class="user-info">
+      <span id="userEmail"></span>
+      <button class="btn btn-ghost btn-sm" onclick="sair()">Sair</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- DADOS GERAIS -->
+    <div class="card">
+      <div class="section-title">Dados da prova</div>
+      <div class="form-group">
+        <label>Nome da prova</label>
+        <input type="text" id="nomeProva" placeholder="Ex: Prova Aberta - Frações">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Bimestre</label>
+          <select id="bimestre">
+            <option value="1">1º</option>
+            <option value="2">2º</option>
+            <option value="3" selected>3º</option>
+            <option value="4">4º</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Peso na média</label>
+          <input type="number" id="peso" value="1" step="0.1">
+        </div>
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-secondary" style="width: 100%;" onclick="abrirModalColar()">
+            📋 Colar do Word
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- QUESTÕES -->
+    <div class="card">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div class="section-title" style="margin: 0; border: none; padding: 0;">
+          Questões (<span id="totalQuestoes">0</span>)
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="adicionarQuestao()">+ Adicionar</button>
+      </div>
+      <div id="questoesContainer"></div>
+    </div>
+
+    <!-- SALVAR -->
+    <button class="btn btn-primary" style="width: 100%; padding: 14px;" onclick="salvarProva()">
+      💾 SALVAR PROVA ABERTA
+    </button>
+
+    <!-- LISTA DE PROVAS -->
+    <div class="card provas-lista">
+      <div class="section-title">Minhas provas cadastradas</div>
+      <div id="provasLista"><div class="loading">Carregando...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COLAR -->
+<div id="modalColar" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>📋 Colar prova do Word/Docs</h3>
+      <button class="btn btn-sm" onclick="fecharModal()">✕</button>
+    </div>
+    <p style="font-size: 13px; margin-bottom: 8px;">Cole no formato:</p>
+    <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; margin-bottom: 12px;">
+      1) Enunciado da questão | critério de correção | valor<br>
+      2) Outra questão | critério | valor
+    </div>
+    <textarea id="textareaColar" style="width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui..."></textarea>
+    <div style="display: flex; gap: 8px; margin-top: 16px;">
+      <button class="btn btn-secondary" style="flex: 1;" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-primary" style="flex: 1;" onclick="colarDoWord()">Usar essas</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ===== CONFIGURAÇÃO =====
+  const SUPABASE_URL = 'https://mkqnaiuplkqiitwxltli.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rcW5haXVwbGtxaWl0d3hsdGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTg5MzMsImV4cCI6MjA5OTk3NDkzM30.65MoDC1gMNpNs6bCKZlCTyCn2ijaaA6y9DOnQgNxacA';
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let questoes = [];
+
+  // ===== TOAST =====
+  function toast(msg, tipo = 'info') {
+    const el = document.createElement('div');
+    el.className = `toast ${tipo}`;
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 4000);
+  }
+
+  // ===== AUTH =====
+  async function verificarSessao() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      mostrarPrincipal(session.user.email);
+    } else {
+      document.getElementById('authScreen').classList.remove('hidden');
+      document.getElementById('mainScreen').classList.add('hidden');
+    }
+  }
+
+  function trocarTab(tab) {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    if (tab === 'login') {
+      event.target.classList.add('active');
+      document.getElementById('loginForm').classList.remove('hidden');
+      document.getElementById('signupForm').classList.add('hidden');
+    } else {
+      event.target.classList.add('active');
+      document.getElementById('loginForm').classList.add('hidden');
+      document.getElementById('signupForm').classList.remove('hidden');
+    }
+  }
+
+  async function fazerLogin() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    if (!email || !password) { toast('Preencha e-mail e senha', 'error'); return; }
+    
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      toast('Erro: ' + error.message, 'error');
+    } else {
+      toast('Bem-vindo!', 'success');
+      mostrarPrincipal(data.user.email);
+    }
+  }
+
+  async function criarConta() {
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value;
+    if (!email || !password) { toast('Preencha e-mail e senha', 'error'); return; }
+    if (password.length < 6) { toast('Senha precisa ter no mínimo 6 caracteres', 'error'); return; }
+    
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      toast('Erro: ' + error.message, 'error');
+    } else {
+      if (data.user && !data.session) {
+        toast('Conta criada! Verifique seu e-mail para confirmar.', 'info');
+      } else {
+        toast('Conta criada e logada!', 'success');
+        mostrarPrincipal(data.user.email);
+      }
+    }
+  }
+
+  async function sair() {
+    await supabase.auth.signOut();
+    location.reload();
+  }
+
+  function mostrarPrincipal(email) {
+    document.getElementById('authScreen').classList.add('hidden');
+    document.getElementById('mainScreen').classList.remove('hidden');
+    document.getElementById('userEmail').textContent = email;
+    adicionarQuestao();
+    carregarProvas();
+  }
+
+  // ===== QUESTÕES =====
+  function adicionarQuestao() {
+    questoes.push({ enunciado: '', resposta: '', valor: '2' });
+    renderizarQuestoes();
+  }
+
+  function removerQuestao(i) {
+    if (questoes.length > 1) {
+      questoes.splice(i, 1);
+      renderizarQuestoes();
+    }
+  }
+
+  function renderizarQuestoes() {
+    const container = document.getElementById('questoesContainer');
+    document.getElementById('totalQuestoes').textContent = questoes.length;
+    container.innerHTML = questoes.map((q, i) => `
+      <div class="questao-card">
+        <div class="questao-header">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div class="questao-num">${i + 1}</div>
+            <strong>Questão ${i + 1}</strong>
+          </div>
+          <button class="remove-btn" onclick="removerQuestao(${i})" title="Remover">🗑️</button>
+        </div>
+        <div class="form-group">
+          <label>Enunciado</label>
+          <textarea rows="4" onchange="atualizarQuestao(${i}, 'enunciado', this.value)">${q.enunciado}</textarea>
+        </div>
+        <div class="form-group">
+          <label>Resposta esperada / critério</label>
+          <textarea rows="4" onchange="atualizarQuestao(${i}, 'resposta', this.value)">${q.resposta}</textarea>
+        </div>
+        <div class="form-group" style="max-width: 150px;">
+          <label>Valor</label>
+          <input type="number" step="0.1" value="${q.valor}" onchange="atualizarQuestao(${i}, 'valor', this.value)">
+        </div>
+      </div>
+    `).join('');
+  }
+
+  function atualizarQuestao(i, campo, valor) {
+    questoes[i][campo] = valor;
+  }
+
+  // ===== MODAL COLAR =====
+  function abrirModalColar() {
+    document.getElementById('modalColar').classList.add('active');
+    document.getElementById('textareaColar').value = '';
+  }
+  function fecharModal() {
+    document.getElementById('modalColar').classList.remove('active');
+  }
+
+  function colarDoWord() {
+    const texto = document.getElementById('textareaColar').value;
+    if (!texto.trim()) { toast('Cole o texto primeiro', 'error'); return; }
+    
+    const novas = [];
+    const linhas = texto.split('\n').map(l => l.trim()).filter(l => l);
+    
+    for (const linha of linhas) {
+      const match = linha.match(/^(\d+)\s*[).\-]\s*(.*)/);
+      if (match) {
+        const resto = match[2] || '';
+        const partes = resto.split('|').map(p => p.trim());
+        novas.push({
+          enunciado: partes[0] || '',
+          resposta: partes[1] || '',
+          valor: partes[2] ? String(parseFloat(partes[2].replace(',', '.')) || 2) : '2'
+        });
+      } else if (novas.length > 0) {
+        novas[novas.length - 1].enunciado += '\n' + linha;
+      }
+    }
+    
+    if (novas.length === 0) {
+      toast('Não consegui entender o texto. Use o formato "1) enunciado | critério | valor"', 'error');
+      return;
+    }
+    
+    questoes = novas;
+    renderizarQuestoes();
+    fecharModal();
+    toast(`${novas.length} questão(ões) importada(s)!`, 'success');
+  }
+
+  // ===== SALVAR =====
+  async function salvarProva() {
+    const nome = document.getElementById('nomeProva').value.trim();
+    const bimestre = parseInt(document.getElementById('bimestre').value);
+    const peso = parseFloat(document.getElementById('peso').value) || 1;
+    
+    if (!nome) { toast('Dê um nome para a prova!', 'error'); return; }
+    if (questoes.length === 0) { toast('Adicione ao menos uma questão!', 'error'); return; }
+    
+    for (let i = 0; i < questoes.length; i++) {
+      if (!questoes[i].enunciado.trim()) {
+        toast(`Questão ${i + 1} está sem enunciado!`, 'error');
+        return;
+      }
+    }
+    
+    try {
+      const { data: avalData, error: avalError } = await supabase
+        .from('avaliacoes')
+        .insert({
+          nome: nome,
+          data_prova: new Date().toISOString().split('T')[0],
+          numero_questoes: questoes.length,
+          bimestre: bimestre,
+          peso_media: peso,
+          modo_correcao: 'aberta',
+          tipo: 'Prova Aberta'
+        })
+        .select('id')
+        .single();
+      
+      if (avalError) throw avalError;
+      
+      const linhas = questoes.map((q, i) => ({
+        id_avaliacao: avalData.id,
+        numero: i + 1,
+        enunciado: q.enunciado.trim(),
+        resposta_esperada: q.resposta.trim(),
+        valor: parseFloat(q.valor.replace(',', '.')) || 2
+      }));
+      
+      const { error: qError } = await supabase.from('questoes_abertas').insert(linhas);
+      if (qError) throw qError;
+      
+      toast(`✅ Prova cadastrada com ${questoes.length} questão(ões)!`, 'success');
+      
+      // Limpa o form
+      document.getElementById('nomeProva').value = '';
+      questoes = [{ enunciado: '', resposta: '', valor: '2' }];
+      renderizarQuestoes();
+      carregarProvas();
+      
+    } catch (e) {
+      toast('Erro ao salvar: ' + e.message, 'error');
+    }
+  }
+
+  // ===== CARREGAR PROVAS =====
+  async function carregarProvas() {
+    const lista = document.getElementById('provasLista');
+    lista.innerHTML = '<div class="loading">Carregando...</div>';
+    
+    try {
+      const { data, error } = await supabase
+        .from('avaliacoes')
+        .select('id, nome, bimestre, numero_questoes, data_prova')
+        .eq('modo_correcao', 'aberta')
+        .order('id', { ascending: false });
+      
+      if (error) throw error;
+      
+      if (!data || data.length === 0) {
+        lista.innerHTML = '<p style="color: #888; text-align: center; padding: 20px;">Nenhuma prova cadastrada ainda.</p>';
+        return;
+      }
+      
+      lista.innerHTML = data.map(p => `
+        <div class="prova-item">
+          <div class="prova-item-info">
+            <strong>${p.nome}</strong>
+            <div class="prova-item-meta">
+              ${p.numero_questoes} questões • ${p.bimestre}º bimestre • ${p.data_prova}
+            </div>
+          </div>
+          <button class="btn btn-danger btn-sm" onclick="excluirProva(${p.id}, '${p.nome.replace(/'/g, "\\'")}')">🗑️</button>
+        </div>
+      `).join('');
+      
+    } catch (e) {
+      lista.innerHTML = '<p style="color: #dc3545; text-align: center; padding: 20px;">Erro ao carregar: ' + e.message + '</p>';
+    }
+  }
+
+  async function excluirProva(id, nome) {
+    if (!confirm(`Excluir "${nome}"?\n\nTodas as questões serão apagadas. Essa ação não pode ser desfeita.`)) return;
+    
+    try {
+      await supabase.from('questoes_abertas').delete().eq('id_avaliacao', id);
+      await supabase.from('avaliacoes').delete().eq('id', id);
+      toast('Prova excluída!', 'success');
+      carregarProvas();
+    } catch (e) {
+      toast('Erro: ' + e.message, 'error');
+    }
+  }
+
+  // ===== INIT =====
+  verificarSessao();
+</script>
+
 </body>
 </html>

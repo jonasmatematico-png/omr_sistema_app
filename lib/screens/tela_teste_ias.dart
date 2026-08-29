@@ -15,7 +15,7 @@ class TelaTesteIAs extends StatefulWidget {
 
 class _TelaTesteIAsState extends State<TelaTesteIAs> {
   static const String _modeloGemini = 'gemini-3.6-flash';
-  static const String _modeloGroq = 'meta-llama/llama-4-scout-17b-16e-instruct';
+  static const String _modeloGroq = 'qwen/qwen3.6-27b';
 
   List<String> _geminiChaves = [];
   String _groqKey = '';
@@ -27,6 +27,7 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
   bool _rodando = false;
   String _etapa = '';
 
+  List<Map<String, dynamic>> _questoesTeste = [];
   Map<String, dynamic>? _resGemini;
   Map<String, dynamic>? _resGroq;
 
@@ -89,6 +90,10 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
       '[{"numero":1,"transcricao":"...","nota_sugerida":1.5,"justificativa":"...","revisar":false}]',
     );
     sb.writeln('Cada nota_sugerida deve ficar entre 0 e o valor da questão.');
+    sb.writeln('/no_think');
+    sb.writeln(
+      'Responda IMEDIATAMENTE somente o array JSON, sem nenhum texto antes ou depois.',
+    );
     return sb.toString();
   }
 
@@ -97,7 +102,10 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
     final i = t.indexOf('[');
     final f = t.lastIndexOf(']');
     if (i == -1 || f == -1 || f <= i) {
-      throw Exception('A IA não retornou uma lista válida.');
+      final amostra = t.length > 300 ? t.substring(0, 300) : t;
+      throw Exception(
+        'A IA não retornou uma lista válida. Ela disse: "$amostra"',
+      );
     }
     final arr = jsonDecode(t.substring(i, f + 1)) as List;
     return arr.map((e) => Map<String, dynamic>.from(e as Map)).toList();
@@ -174,6 +182,7 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
         {'role': 'user', 'content': conteudo},
       ],
       'temperature': 0.2,
+      'reasoning_effort': 'none',
     });
 
     final response = await http
@@ -190,7 +199,7 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
       throw Exception('Groq ${response.statusCode}: ${response.body}');
     }
     final json = jsonDecode(response.body);
-    return _parseJson(json['choices'][0]['message']['content'] as String);
+    return _parseJson('${json['choices'][0]['message']['content']}');
   }
 
   Future<void> _escolherFoto() async {
@@ -239,6 +248,7 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
       _rodando = true;
       _resGemini = null;
       _resGroq = null;
+      _questoesTeste = [];
     });
     try {
       final supabase = Supabase.instance.client;
@@ -251,6 +261,7 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
       if (questoes.isEmpty) {
         throw Exception('A prova escolhida não tem questões.');
       }
+      setState(() => _questoesTeste = questoes);
 
       final List<List<int>> bytesLista = [];
       for (final c in _caminhos) {
@@ -323,12 +334,26 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
     }
   }
 
-  Widget _cardResultado(
-    String titulo,
-    Color cor,
-    Map<String, dynamic>? res,
-    List<Map<String, dynamic>> questoes,
-  ) {
+  Widget _chipChave(String rotulo, bool ok, Color cor) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: ok ? cor.withOpacity(0.15) : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: ok ? cor : Colors.grey),
+      ),
+      child: Text(
+        ok ? '$rotulo ✅' : '$rotulo ❌',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: ok ? cor : Colors.grey,
+        ),
+      ),
+    );
+  }
+
+  Widget _cardResultado(String titulo, Color cor, Map<String, dynamic>? res) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -375,58 +400,59 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
                 style: const TextStyle(color: Colors.red, fontSize: 12),
               )
             else
-              ...(() {
-                final sugs = (res['sugestoes'] as List)
-                    .cast<Map<String, dynamic>>();
-                return questoes.map((q) {
-                  final n = (q['numero'] as num?)?.toInt() ?? 0;
-                  final s = sugs
-                      .where((x) => (x['numero'] as num?)?.toInt() == n)
-                      .toList();
-                  final nota = s.isNotEmpty
-                      ? (s.first['nota_sugerida'] as num?)?.toDouble() ?? 0
-                      : null;
-                  final transc = s.isNotEmpty
-                      ? '${s.first['transcricao']}'
-                      : '—';
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Q$n • Nota: ${nota?.toStringAsFixed(1) ?? '—'} / ${(q['valor'] as num?)?.toDouble().toStringAsFixed(1)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                        ),
-                        Text(
-                          '✍️ "$transc"',
-                          style: TextStyle(
-                            fontSize: 11,
-                            fontStyle: FontStyle.italic,
-                            color: Colors.grey.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList();
-              })(),
+              ..._buildLinhasResultado(res),
           ],
         ),
       ),
     );
   }
 
+  List<Widget> _buildLinhasResultado(Map<String, dynamic> res) {
+    final sugs = List<Map<String, dynamic>>.from(res['sugestoes'] as List);
+    final linhas = <Widget>[];
+    for (final q in _questoesTeste) {
+      final n = (q['numero'] as num?)?.toInt() ?? 0;
+      final s = sugs.where((x) => (x['numero'] as num?)?.toInt() == n).toList();
+      final nota = s.isNotEmpty
+          ? (s.first['nota_sugerida'] as num?)?.toDouble()
+          : null;
+      final transc = s.isNotEmpty ? '${s.first['transcricao']}' : '—';
+      linhas.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Q$n • Nota: ${nota?.toStringAsFixed(1) ?? '—'} / ${(q['valor'] as num?)?.toDouble().toStringAsFixed(1)}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+              Text(
+                '✍️ "$transc"',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return linhas;
+  }
+
   @override
   Widget build(BuildContext context) {
     String? vencedor;
-    if (_resGemini?['erro'] == null &&
-        _resGroq?['erro'] == null &&
-        _resGemini != null &&
-        _resGroq != null) {
+    if (_resGemini != null &&
+        _resGroq != null &&
+        _resGemini!['erro'] == null &&
+        _resGroq!['erro'] == null) {
       final tg = _resGemini!['tempo'] as double;
       final tr = _resGroq!['tempo'] as double;
       vencedor = tg <= tr ? '🟠 Gemini' : '⚡ Groq';
@@ -544,42 +570,11 @@ class _TelaTesteIAsState extends State<TelaTesteIAs> {
               ),
             ),
           const SizedBox(height: 8),
-          _cardResultado(
-            '🟠 Gemini',
-            Colors.deepOrange,
-            _resGemini,
-            _constQuestoesVazia(),
-          ),
+          _cardResultado('🟠 Gemini', Colors.deepOrange, _resGemini),
           const SizedBox(height: 8),
-          _cardResultado(
-            '⚡ Groq',
-            Colors.blue,
-            _resGroq,
-            _constQuestoesVazia(),
-          ),
+          _cardResultado('⚡ Groq', Colors.blue, _resGroq),
         ],
       ),
     );
   }
-
-  List<Map<String, dynamic>> _constQuestoesVazia() => const [];
-}
-
-Widget _chipChave(String rotulo, bool ok, Color cor) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-    decoration: BoxDecoration(
-      color: ok ? cor.withOpacity(0.15) : Colors.grey.shade200,
-      borderRadius: BorderRadius.circular(12),
-      border: Border.all(color: ok ? cor : Colors.grey),
-    ),
-    child: Text(
-      ok ? '$rotulo ✅' : '$rotulo ❌',
-      style: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.bold,
-        color: ok ? cor : Colors.grey,
-      ),
-    ),
-  );
 }

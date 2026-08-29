@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-// 📝 Rascunho de questão aberta
 class _QuestaoDraft {
   final TextEditingController enunciado = TextEditingController();
   final TextEditingController resposta = TextEditingController();
@@ -30,6 +29,188 @@ class _TelaCadastroAvaliacaoAbertaState
     if (_questoes.length > 1) setState(() => _questoes.removeAt(i));
   }
 
+  // 🚨 NOVO: parse do texto colado do Word/Docs
+  List<_QuestaoDraft> _parseTextoColado(String texto) {
+    final drafts = <_QuestaoDraft>[];
+    final linhas = texto
+        .split('\n')
+        .map((l) => l.trim())
+        .where((l) => l.isNotEmpty)
+        .toList();
+
+    for (final linha in linhas) {
+      // Detecta linha que começa com número (ex: "1)", "2.", "10)")
+      final match = RegExp(r'^(\d+)\s*[).\-]\s*(.*)').firstMatch(linha);
+
+      if (match != null) {
+        // Nova questão
+        final resto = match.group(2) ?? '';
+        final partes = resto.split('|').map((p) => p.trim()).toList();
+
+        final d = _QuestaoDraft();
+        d.enunciado.text = partes.isNotEmpty ? partes[0] : '';
+        d.resposta.text = partes.length > 1 ? partes[1] : '';
+        if (partes.length > 2) {
+          final v = double.tryParse(partes[2].replaceAll(',', '.'));
+          if (v != null) d.valor.text = v.toStringAsFixed(1);
+        }
+        drafts.add(d);
+      } else if (drafts.isNotEmpty) {
+        // Linha contínua: anexa ao enunciado da questão anterior
+        drafts.last.enunciado.text = '${drafts.last.enunciado.text}\n$linha';
+      }
+    }
+    return drafts;
+  }
+
+  // 🚨 NOVO: dialog de colar
+  Future<void> _colarProva() async {
+    final colarController = TextEditingController();
+    List<_QuestaoDraft> parsed = [];
+    bool temPreview = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialog) => AlertDialog(
+          title: const Text('📋 Colar prova do Word/Docs'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Cole abaixo o texto da prova. Formato aceito:',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  Container(
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
+                    child: const Text(
+                      '1) Enunciado da questão | critério de correção | valor\n'
+                      '2) Outra questão | critério | valor\n'
+                      '(cada "|" separa os campos)',
+                      style: TextStyle(fontFamily: 'monospace', fontSize: 11),
+                    ),
+                  ),
+                  TextField(
+                    controller: colarController,
+                    maxLines: 8,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      hintText: 'Cole aqui...',
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (temPreview && parsed.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.green.shade50,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.green),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '✅ ${parsed.length} questão(ões) encontrada(s):',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 4),
+                          ...parsed.take(5).toList().asMap().entries.map((e) {
+                            final i = e.key;
+                            final q = e.value;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 2),
+                              child: Text(
+                                '${i + 1}. ${q.enunciado.text.length > 60 ? '${q.enunciado.text.substring(0, 60)}...' : q.enunciado.text} | ${q.valor.text}',
+                                style: const TextStyle(fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            );
+                          }),
+                          if (parsed.length > 5)
+                            Text(
+                              '... e mais ${parsed.length - 5}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () {
+                final result = _parseTextoColado(colarController.text);
+                if (result.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        '⚠️ Não consegui entender o texto. Use o formato "1) enunciado | critério | valor".',
+                      ),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                  return;
+                }
+                setDialog(() {
+                  parsed = result;
+                  temPreview = true;
+                });
+              },
+              child: const Text('🔍 Analisar'),
+            ),
+            ElevatedButton(
+              onPressed: temPreview && parsed.isNotEmpty
+                  ? () {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        for (final q in _questoes) {
+                          q.enunciado.dispose();
+                          q.resposta.dispose();
+                          q.valor.dispose();
+                        }
+                        _questoes
+                          ..clear()
+                          ..addAll(parsed);
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '✅ ${parsed.length} questão(ões) importadas!',
+                          ),
+                          backgroundColor: Colors.green,
+                        ),
+                      );
+                    }
+                  : null,
+              child: const Text('Usar essas'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _salvar() async {
     if (_nomeController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -56,7 +237,6 @@ class _TelaCadastroAvaliacaoAbertaState
     try {
       final supabase = Supabase.instance.client;
 
-      // 1) Cria a avaliação (modo 'aberta') e pega o ID dela
       final resp = await supabase
           .from('avaliacoes')
           .insert({
@@ -75,7 +255,6 @@ class _TelaCadastroAvaliacaoAbertaState
 
       final int idAval = resp['id'] as int;
 
-      // 2) Salva as questões vinculadas a ela
       final List<Map<String, dynamic>> linhas = [];
       for (int i = 0; i < _questoes.length; i++) {
         linhas.add({
@@ -152,7 +331,7 @@ class _TelaCadastroAvaliacaoAbertaState
             ),
             TextField(
               controller: q.enunciado,
-              maxLines: 2,
+              maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Enunciado',
                 border: OutlineInputBorder(),
@@ -161,7 +340,7 @@ class _TelaCadastroAvaliacaoAbertaState
             const SizedBox(height: 8),
             TextField(
               controller: q.resposta,
-              maxLines: 2,
+              maxLines: 3,
               decoration: const InputDecoration(
                 labelText: 'Resposta esperada / critério',
                 border: OutlineInputBorder(),
@@ -250,6 +429,17 @@ class _TelaCadastroAvaliacaoAbertaState
                   ),
                 ),
                 const Spacer(),
+                // 🚨 NOVO: botão colar
+                ElevatedButton.icon(
+                  onPressed: _colarProva,
+                  icon: const Icon(Icons.content_paste, size: 18),
+                  label: const Text('Colar', style: TextStyle(fontSize: 12)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 ElevatedButton.icon(
                   onPressed: _addQuestao,
                   icon: const Icon(Icons.add, size: 18),
