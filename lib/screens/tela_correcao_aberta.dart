@@ -459,7 +459,22 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     sb.writeln(
       '[{"numero":1,"transcricao":"...","nota_sugerida":1.5,"justificativa":"...","revisar":false}]',
     );
+
     sb.writeln('Cada nota_sugerida deve ficar entre 0 e o valor da questão.');
+    final comImagem = questoes
+        .where((q) => '${q['imagem_url'] ?? ''}'.isNotEmpty)
+        .toList();
+    if (comImagem.isNotEmpty) {
+      sb.writeln('');
+      sb.writeln(
+        'IMAGENS DE REFERÊNCIA: as primeiras ${comImagem.length} imagem(ns) anexadas são, NA ORDEM, os enunciados visuais das questões ${comImagem.map((q) => q['numero']).join(', ')}.',
+      );
+      sb.writeln(
+        'As demais imagens anexadas são as folhas de resposta do aluno.',
+      );
+    } else {
+      sb.writeln('As imagens anexadas são as folhas de resposta do aluno.');
+    }
     sb.writeln('/no_think');
     sb.writeln(
       'Responda IMEDIATAMENTE somente o array JSON, sem nenhum texto antes ou depois.',
@@ -481,6 +496,26 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     return arr.map((e) => Map<String, dynamic>.from(e as Map)).toList();
   }
 
+  Future<List<int>> _baixarImagem(String url) async {
+    final r = await http
+        .get(Uri.parse(url))
+        .timeout(const Duration(seconds: 30));
+    if (r.statusCode != 200) {
+      throw Exception(
+        'Não consegui baixar a imagem do enunciado (${r.statusCode}).',
+      );
+    }
+    return r.bodyBytes;
+  }
+
+  String _mimeDe(String url) {
+    final u = url.toLowerCase();
+    if (u.endsWith('.png')) return 'image/png';
+    if (u.endsWith('.webp')) return 'image/webp';
+    if (u.endsWith('.gif')) return 'image/gif';
+    return 'image/jpeg';
+  }
+
   Future<List<Map<String, dynamic>>> _chamarIA(
     List<String> caminhos,
     List<Map<String, dynamic>> questoes,
@@ -499,6 +534,18 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       throw Exception('Cadastre ao menos uma chave Gemini.');
 
     final List<Map<String, dynamic>> partesImagem = [];
+    for (final q in questoes) {
+      final url = '${q['imagem_url'] ?? ''}';
+      if (url.isNotEmpty) {
+        final bytes = await _baixarImagem(url);
+        partesImagem.add({
+          'inline_data': {
+            'mime_type': _mimeDe(url),
+            'data': base64Encode(bytes),
+          },
+        });
+      }
+    }
     for (final caminho in caminhos) {
       final bytesPagina = await File(caminho).readAsBytes();
       partesImagem.add({
@@ -587,9 +634,29 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     if (_chavesGroq.isEmpty)
       throw Exception('Cadastre ao menos uma chave Groq.');
 
+    final refs = questoes
+        .where((q) => '${q['imagem_url'] ?? ''}'.isNotEmpty)
+        .toList();
+    final totalImagens = refs.length + caminhos.length;
+    if (totalImagens > 5) {
+      throw Exception(
+        'Esta correção tem $totalImagens imagens (figuras + folhas) e o Groq aceita no máximo 5 por pedido. Use o 🟠 Gemini para esta prova.',
+      );
+    }
+
     final List<Map<String, dynamic>> conteudo = [
       {'type': 'text', 'text': _montarPrompt(questoes)},
     ];
+    for (final q in refs) {
+      final url = '${q['imagem_url']}';
+      final bytes = await _baixarImagem(url);
+      conteudo.add({
+        'type': 'image_url',
+        'image_url': {
+          'url': 'data:${_mimeDe(url)};base64,${base64Encode(bytes)}',
+        },
+      });
+    }
     for (final caminho in caminhos) {
       final bytes = await File(caminho).readAsBytes();
       conteudo.add({
