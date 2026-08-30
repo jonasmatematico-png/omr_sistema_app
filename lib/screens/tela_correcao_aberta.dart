@@ -521,7 +521,29 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     List<Map<String, dynamic>> questoes,
   ) async {
     if (_provedor == 'groq') {
-      return _chamarGroq(caminhos, questoes);
+      final refs = questoes
+          .where((q) => '${q['imagem_url'] ?? ''}'.isNotEmpty)
+          .length;
+      final totalImagens = refs + caminhos.length;
+      if (totalImagens <= 3) {
+        return _chamarGroq(caminhos, questoes);
+      }
+      if (_chavesGemini.isNotEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '⚡ Groq aceita até 3 imagens; esta prova tem $totalImagens. Usando 🟠 Gemini desta vez.',
+              ),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+        return _chamarGemini(caminhos, questoes);
+      }
+      throw Exception(
+        'Esta prova tem $totalImagens imagens e o ⚡ Groq aceita até 3. Cadastre uma chave 🟠 Gemini para corrigi-la.',
+      );
     }
     return _chamarGemini(caminhos, questoes);
   }
@@ -638,9 +660,9 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         .where((q) => '${q['imagem_url'] ?? ''}'.isNotEmpty)
         .toList();
     final totalImagens = refs.length + caminhos.length;
-    if (totalImagens > 5) {
+    if (totalImagens > 3) {
       throw Exception(
-        'Esta correção tem $totalImagens imagens (figuras + folhas) e o Groq aceita no máximo 5 por pedido. Use o 🟠 Gemini para esta prova.',
+        'Esta correção tem $totalImagens imagens e o Groq aceita no máximo 3 por pedido.',
       );
     }
 
