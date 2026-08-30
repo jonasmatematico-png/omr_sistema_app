@@ -99,6 +99,19 @@
     <div class="card">
       <div class="section-title">Dados da prova</div>
       <div class="form-group"><label>Nome da prova</label><input type="text" id="nomeProva" placeholder="Ex: Prova Aberta - Frações"></div>
+      <div class="form-group"><label>Matéria</label>
+        <select id="disciplina">
+          <option selected>Matemática</option>
+          <option>Português</option>
+          <option>História</option>
+          <option>Geografia</option>
+          <option>Ciências</option>
+          <option>Inglês</option>
+          <option>Arte</option>
+          <option>Sociologia</option>
+          <option>Filosofia</option>
+        </select>
+      </div>
       <div class="form-row">
         <div class="form-group"><label>Bimestre</label>
           <select id="bimestre"><option value="1">1º</option><option value="2">2º</option><option value="3" selected>3º</option><option value="4">4º</option></select>
@@ -257,6 +270,7 @@
     editandoId = null;
     document.getElementById('nomeProva').value = '';
     document.getElementById('bimestre').value = '3';
+    document.getElementById('disciplina').value = 'Matemática';
     document.getElementById('peso').value = '1';
     document.getElementById('bannerEdicao').classList.add('hidden');
     document.getElementById('btnSalvar').textContent = '💾 SALVAR PROVA ABERTA';
@@ -429,8 +443,9 @@
       var r2 = await sbFetch('GET', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + id + '&select=enunciado,resposta_esperada,valor,imagem_url&order=numero.asc');
       var qs = await r2.json();
       document.getElementById('nomeProva').value = a.nome;
-      document.getElementById('bimestre').value = String(a.bimestre);
+      document.getElementById('bimestre').value = String(a.bimestre)
       document.getElementById('peso').value = String(a.peso_media);
+      document.getElementById('disciplina').value = a.disciplina || 'Matemática';
       questoes = qs.map(function (q) {
         return { enunciado: q.enunciado, resposta: q.resposta_esperada, valor: String(q.valor), imagemUrl: q.imagem_url, file: null };
       });
@@ -449,6 +464,7 @@
     var nome = document.getElementById('nomeProva').value.trim();
     var bimestre = parseInt(document.getElementById('bimestre').value);
     var peso = parseFloat(document.getElementById('peso').value) || 1;
+    var disciplina = document.getElementById('disciplina').value;
     if (!nome) { toast('Dê um nome para a prova!', 'error'); return; }
     if (questoes.length === 0) { toast('Adicione ao menos uma questão!', 'error'); return; }
     for (var i = 0; i < questoes.length; i++) {
@@ -462,10 +478,9 @@
           questoes[k].file = null;
         }
       }
-
       var idAval;
       if (editandoId) {
-        var ru = await sbFetch('PATCH', '/rest/v1/avaliacoes?id=eq.' + editandoId, { nome: nome, bimestre: bimestre, peso_media: peso, numero_questoes: questoes.length });
+        var ru = await sbFetch('PATCH', '/rest/v1/avaliacoes?id=eq.' + editandoId, { nome: nome, bimestre: bimestre, peso_media: peso, numero_questoes: questoes.length, disciplina: disciplina });
         if (!ru.ok) { toast('Erro ao atualizar: ' + msgErro(await ru.json()), 'error'); return; }
         await sbFetch('DELETE', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + editandoId);
         idAval = editandoId;
@@ -473,7 +488,7 @@
         var r1 = await sbFetch('POST', '/rest/v1/avaliacoes', {
           nome: nome, data_prova: new Date().toISOString().split('T')[0],
           numero_questoes: questoes.length, bimestre: bimestre, peso_media: peso,
-          modo_correcao: 'aberta', tipo: 'Prova Aberta'
+          disciplina: disciplina, modo_correcao: 'aberta', tipo: 'Prova Aberta'
         }, 'return=representation');
         if (!r1.ok) { toast('Erro ao criar prova: ' + msgErro(await r1.json()), 'error'); return; }
         idAval = (await r1.json())[0].id;

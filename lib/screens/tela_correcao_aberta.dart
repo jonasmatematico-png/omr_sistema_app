@@ -43,6 +43,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   List<Map<String, dynamic>> _sugestoes = [];
   final Map<int, TextEditingController> _notaControllers = {};
   List<String> _ultimosCaminhos = [];
+  String _disciplinaAtual = 'Matemática';
 
   @override
   void initState() {
@@ -429,7 +430,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
 
   String _montarPrompt(List<Map<String, dynamic>> questoes) {
     final sb = StringBuffer();
-    sb.writeln('Você é um professor assistente de Matemática (6º e 9º ano).');
+    sb.writeln('Você é um professor assistente de $_disciplinaAtual.');
+    sb.writeln(
+      'Avalie com os critérios, conceitos e vocabulário próprios de $_disciplinaAtual.',
+    );
     sb.writeln(
       'As imagens anexas são a prova manuscrita de um aluno (1 ou mais folhas).',
     );
@@ -512,7 +516,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     return 'image/jpeg';
   }
 
-  // 🔲 Lê TODOS os QRs das folhas e junta: prova (OMRPROVA/OMRALUNO) + aluno (OMRALUNO/OMRCARD)
   Future<Map<String, int?>> _lerQRDasFolhas(List<String> caminhos) async {
     int? prova;
     int? aluno;
@@ -887,6 +890,16 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         throw Exception('Escolha a prova acima — ou use folhas com QR.');
       }
 
+      final rDisc = await supabase
+          .from('avaliacoes')
+          .select('disciplina')
+          .eq('id', idAvalEfetivo)
+          .maybeSingle();
+      _disciplinaAtual =
+          (rDisc != null && '${rDisc['disciplina'] ?? ''}'.isNotEmpty)
+          ? '${rDisc['disciplina']}'
+          : 'Matemática';
+
       final qs = await supabase
           .from('questoes_abertas')
           .select('*')
@@ -936,6 +949,15 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
           .eq('id_avaliacao', avalId!)
           .order('numero');
       final questoes = List<Map<String, dynamic>>.from(qs);
+      final rDisc = await supabase
+          .from('avaliacoes')
+          .select('disciplina')
+          .eq('id', avalId!)
+          .maybeSingle();
+      _disciplinaAtual =
+          (rDisc != null && '${rDisc['disciplina'] ?? ''}'.isNotEmpty)
+          ? '${rDisc['disciplina']}'
+          : 'Matemática';
       final sugestoes = await _chamarIA(_ultimosCaminhos, questoes);
       await _prepararRevisao(questoes, sugestoes);
       if (mounted) {
