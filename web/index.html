@@ -16,6 +16,7 @@
     .btn-secondary { background: #ff6b35; color: white; }
     .btn-ghost { background: transparent; color: white; border: 1px solid white; }
     .btn-danger { background: #dc3545; color: white; }
+    .btn-warn { background: #ffc107; color: #333; }
     .btn-sm { padding: 6px 12px; font-size: 12px; }
     .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .form-group { margin-bottom: 16px; }
@@ -46,6 +47,7 @@
     .prova-item-meta { font-size: 12px; color: #666; margin-top: 2px; }
     .section-title { font-size: 16px; font-weight: 600; color: #008080; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e0e0e0; }
     .loading { text-align: center; padding: 40px; color: #666; }
+    .banner-edit { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
   </style>
 </head>
 <body>
@@ -72,13 +74,19 @@
 
 <div id="mainScreen" class="hidden">
   <div class="header">
-    <h1>📝 Cadastrar Prova Aberta</h1>
+    <h1>📝 Provas Abertas</h1>
     <div class="user-info">
       <span id="userEmail"></span>
       <button class="btn btn-ghost btn-sm" onclick="sair()">Sair</button>
     </div>
   </div>
   <div class="container">
+
+    <div id="bannerEdicao" class="banner-edit hidden">
+      <span id="bannerTexto" style="font-weight:600;color:#856404;">✏️ Editando prova</span>
+      <button class="btn btn-sm" style="background:#856404;color:white;" onclick="cancelarEdicao()">Cancelar edição</button>
+    </div>
+
     <div class="card">
       <div class="section-title">Dados da prova</div>
       <div class="form-group"><label>Nome da prova</label><input type="text" id="nomeProva" placeholder="Ex: Prova Aberta - Frações"></div>
@@ -90,6 +98,7 @@
         <div class="form-group"><label>&nbsp;</label><button class="btn btn-secondary" style="width: 100%;" onclick="abrirModalColar()">📋 Colar do Word</button></div>
       </div>
     </div>
+
     <div class="card">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
         <div class="section-title" style="margin: 0; border: none; padding: 0;">Questões (<span id="totalQuestoes">0</span>)</div>
@@ -97,7 +106,9 @@
       </div>
       <div id="questoesContainer"></div>
     </div>
-    <button class="btn btn-primary" style="width: 100%; padding: 14px;" onclick="salvarProva()">💾 SALVAR PROVA ABERTA</button>
+
+    <button id="btnSalvar" class="btn btn-primary" style="width: 100%; padding: 14px;" onclick="salvarProva()">💾 SALVAR PROVA ABERTA</button>
+
     <div class="card" style="margin-top: 24px;">
       <div class="section-title">Provas cadastradas</div>
       <div id="provasLista"><div class="loading">Carregando...</div></div>
@@ -128,6 +139,7 @@
   var refreshToken = localStorage.getItem('sb_refresh');
   var userEmail = localStorage.getItem('sb_email') || '';
   var questoes = [];
+  var editandoId = null;
 
   function headersCom(prefer) {
     var h = { 'apikey': ANON, 'Content-Type': 'application/json' };
@@ -135,12 +147,7 @@
     if (token) h['Authorization'] = 'Bearer ' + token;
     return h;
   }
-
-  function msgErro(j) {
-    if (!j) return 'erro desconhecido';
-    return j.error_description || j.msg || j.message || JSON.stringify(j);
-  }
-
+  function msgErro(j) { if (!j) return 'erro desconhecido'; return j.error_description || j.msg || j.message || JSON.stringify(j); }
   function toast(msg, tipo) {
     tipo = tipo || 'info';
     var el = document.createElement('div');
@@ -149,7 +156,6 @@
     document.body.appendChild(el);
     setTimeout(function () { el.remove(); }, 4500);
   }
-
   function trocarTab(tab) {
     var tabs = document.querySelectorAll('.auth-tab');
     tabs.forEach(function (t) { t.classList.remove('active'); });
@@ -163,82 +169,61 @@
       document.getElementById('signupForm').classList.remove('hidden');
     }
   }
-
   function guardarSessao(j) {
-    token = j.access_token;
-    refreshToken = j.refresh_token;
-    userEmail = j.user.email;
+    token = j.access_token; refreshToken = j.refresh_token; userEmail = j.user.email;
     localStorage.setItem('sb_token', token);
     localStorage.setItem('sb_refresh', refreshToken);
     localStorage.setItem('sb_email', userEmail);
   }
-
   async function fazerLogin() {
     var email = document.getElementById('loginEmail').value.trim();
     var password = document.getElementById('loginPassword').value;
     if (!email || !password) { toast('Preencha e-mail e senha', 'error'); return; }
     try {
-      var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', {
-        method: 'POST',
-        headers: headersCom(null),
-        body: JSON.stringify({ email: email, password: password })
-      });
+      var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=password', { method: 'POST', headers: headersCom(null), body: JSON.stringify({ email: email, password: password }) });
       var j = await r.json();
       if (!r.ok) { toast('Erro: ' + msgErro(j), 'error'); return; }
-      guardarSessao(j);
-      toast('Bem-vindo!', 'success');
-      mostrarPrincipal(userEmail);
-    } catch (e) {
-      toast('Falha de conexão: ' + e.message, 'error');
-    }
+      guardarSessao(j); toast('Bem-vindo!', 'success'); mostrarPrincipal(userEmail);
+    } catch (e) { toast('Falha de conexão: ' + e.message, 'error'); }
   }
-
   async function criarConta() {
     var email = document.getElementById('signupEmail').value.trim();
     var password = document.getElementById('signupPassword').value;
     if (!email || !password) { toast('Preencha e-mail e senha', 'error'); return; }
     if (password.length < 6) { toast('Senha mínima: 6 caracteres', 'error'); return; }
     try {
-      var r = await fetch(SUPABASE_URL + '/auth/v1/signup', {
-        method: 'POST',
-        headers: headersCom(null),
-        body: JSON.stringify({ email: email, password: password })
-      });
+      var r = await fetch(SUPABASE_URL + '/auth/v1/signup', { method: 'POST', headers: headersCom(null), body: JSON.stringify({ email: email, password: password }) });
       var j = await r.json();
       if (!r.ok) { toast('Erro: ' + msgErro(j), 'error'); return; }
-      if (j.access_token) {
-        guardarSessao(j);
-        toast('Conta criada e logada!', 'success');
-        mostrarPrincipal(userEmail);
-      } else {
-        toast('Conta criada! Verifique seu e-mail para confirmar.', 'info');
-      }
-    } catch (e) {
-      toast('Falha de conexão: ' + e.message, 'error');
-    }
+      if (j.access_token) { guardarSessao(j); toast('Conta criada e logada!', 'success'); mostrarPrincipal(userEmail); }
+      else { toast('Conta criada! Verifique seu e-mail para confirmar.', 'info'); }
+    } catch (e) { toast('Falha de conexão: ' + e.message, 'error'); }
   }
-
-  function sair() {
-    localStorage.removeItem('sb_token');
-    localStorage.removeItem('sb_refresh');
-    localStorage.removeItem('sb_email');
-    location.reload();
-  }
+  function sair() { localStorage.removeItem('sb_token'); localStorage.removeItem('sb_refresh'); localStorage.removeItem('sb_email'); location.reload(); }
 
   function mostrarPrincipal(email) {
     document.getElementById('authScreen').classList.add('hidden');
     document.getElementById('mainScreen').classList.remove('hidden');
     document.getElementById('userEmail').textContent = email;
+    novoForm();
+    carregarProvas();
+  }
+
+  function novoForm() {
+    editandoId = null;
+    document.getElementById('nomeProva').value = '';
+    document.getElementById('bimestre').value = '3';
+    document.getElementById('peso').value = '1';
+    document.getElementById('bannerEdicao').classList.add('hidden');
+    document.getElementById('btnSalvar').textContent = '💾 SALVAR PROVA ABERTA';
     questoes = [{ enunciado: '', resposta: '', valor: '2' }];
     renderizarQuestoes();
-    carregarProvas();
   }
 
   // ===== QUESTÕES =====
   function adicionarQuestao() { questoes.push({ enunciado: '', resposta: '', valor: '2' }); renderizarQuestoes(); }
   function removerQuestao(i) { if (questoes.length > 1) { questoes.splice(i, 1); renderizarQuestoes(); } }
   function atualizarQuestao(i, campo, valor) { questoes[i][campo] = valor; }
-
   function renderizarQuestoes() {
     document.getElementById('totalQuestoes').textContent = questoes.length;
     document.getElementById('questoesContainer').innerHTML = questoes.map(function (q, i) {
@@ -255,7 +240,6 @@
 
   function abrirModalColar() { document.getElementById('modalColar').classList.add('active'); document.getElementById('textareaColar').value = ''; }
   function fecharModal() { document.getElementById('modalColar').classList.remove('active'); }
-
   function colarDoWord() {
     var texto = document.getElementById('textareaColar').value;
     if (!texto.trim()) { toast('Cole o texto primeiro', 'error'); return; }
@@ -265,25 +249,20 @@
       if (m) {
         var partes = (m[2] || '').split('|').map(function (p) { return p.trim(); });
         novas.push({ enunciado: partes[0] || '', resposta: partes[1] || '', valor: partes[2] ? String(parseFloat(partes[2].replace(',', '.')) || 2) : '2' });
-      } else if (novas.length > 0) {
-        novas[novas.length - 1].enunciado += '\n' + linha;
-      }
+      } else if (novas.length > 0) { novas[novas.length - 1].enunciado += '\n' + linha; }
     });
     if (novas.length === 0) { toast('Use o formato "1) enunciado | critério | valor"', 'error'); return; }
-    questoes = novas;
-    renderizarQuestoes();
-    fecharModal();
+    questoes = novas; renderizarQuestoes(); fecharModal();
     toast(novas.length + ' questão(ões) importada(s)!', 'success');
   }
 
-  // ===== SALVAR (com reserva: se o login falhar, tenta como o app) =====
+  // ===== REDE =====
   async function sbFetch(method, path, body, prefer) {
     var opts = { method: method, headers: headersCom(prefer) };
     if (body !== undefined) opts.body = JSON.stringify(body);
     var r = await fetch(SUPABASE_URL + path, opts);
     if ((r.status === 401 || r.status === 403) && token) {
-      var h2 = headersCom(prefer);
-      delete h2['Authorization'];
+      var h2 = headersCom(prefer); delete h2['Authorization'];
       var opts2 = { method: method, headers: h2 };
       if (body !== undefined) opts2.body = JSON.stringify(body);
       r = await fetch(SUPABASE_URL + path, opts2);
@@ -291,6 +270,29 @@
     return r;
   }
 
+  // ===== EDITAR =====
+  async function editarProva(id) {
+    try {
+      var r1 = await sbFetch('GET', '/rest/v1/avaliacoes?id=eq.' + id + '&select=*');
+      var a = (await r1.json())[0];
+      var r2 = await sbFetch('GET', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + id + '&select=enunciado,resposta_esperada,valor&order=numero.asc');
+      var qs = await r2.json();
+      document.getElementById('nomeProva').value = a.nome;
+      document.getElementById('bimestre').value = String(a.bimestre);
+      document.getElementById('peso').value = String(a.peso_media);
+      questoes = qs.map(function (q) { return { enunciado: q.enunciado, resposta: q.resposta_esperada, valor: String(q.valor) }; });
+      if (questoes.length === 0) questoes = [{ enunciado: '', resposta: '', valor: '2' }];
+      editandoId = id;
+      document.getElementById('bannerEdicao').classList.remove('hidden');
+      document.getElementById('bannerTexto').textContent = '✏️ Editando: ' + a.nome;
+      document.getElementById('btnSalvar').textContent = '💾 SALVAR ALTERAÇÕES';
+      renderizarQuestoes();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (e) { toast('Erro ao carregar prova: ' + e.message, 'error'); }
+  }
+  function cancelarEdicao() { novoForm(); }
+
+  // ===== SALVAR (cria OU atualiza) =====
   async function salvarProva() {
     var nome = document.getElementById('nomeProva').value.trim();
     var bimestre = parseInt(document.getElementById('bimestre').value);
@@ -301,39 +303,34 @@
       if (!questoes[i].enunciado.trim()) { toast('Questão ' + (i + 1) + ' sem enunciado!', 'error'); return; }
     }
     try {
-      var r1 = await sbFetch('POST', '/rest/v1/avaliacoes', {
-        nome: nome,
-        data_prova: new Date().toISOString().split('T')[0],
-        numero_questoes: questoes.length,
-        bimestre: bimestre,
-        peso_media: peso,
-        modo_correcao: 'aberta',
-        tipo: 'Prova Aberta'
-      }, 'return=representation');
-      if (!r1.ok) { toast('Erro ao criar prova: ' + msgErro(await r1.json()), 'error'); return; }
-      var arr = await r1.json();
-      var idAval = arr[0].id;
+      var idAval;
+      if (editandoId) {
+        // ATUALIZA a prova
+        var ru = await sbFetch('PATCH', '/rest/v1/avaliacoes?id=eq.' + editandoId, { nome: nome, bimestre: bimestre, peso_media: peso, numero_questoes: questoes.length });
+        if (!ru.ok) { toast('Erro ao atualizar: ' + msgErro(await ru.json()), 'error'); return; }
+        await sbFetch('DELETE', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + editandoId);
+        idAval = editandoId;
+      } else {
+        // CRIA prova nova
+        var r1 = await sbFetch('POST', '/rest/v1/avaliacoes', {
+          nome: nome, data_prova: new Date().toISOString().split('T')[0],
+          numero_questoes: questoes.length, bimestre: bimestre, peso_media: peso,
+          modo_correcao: 'aberta', tipo: 'Prova Aberta'
+        }, 'return=representation');
+        if (!r1.ok) { toast('Erro ao criar prova: ' + msgErro(await r1.json()), 'error'); return; }
+        idAval = (await r1.json())[0].id;
+      }
 
       var linhas = questoes.map(function (q, idx) {
-        return {
-          id_avaliacao: idAval,
-          numero: idx + 1,
-          enunciado: q.enunciado.trim(),
-          resposta_esperada: q.resposta.trim(),
-          valor: parseFloat(String(q.valor).replace(',', '.')) || 2
-        };
+        return { id_avaliacao: idAval, numero: idx + 1, enunciado: q.enunciado.trim(), resposta_esperada: q.resposta.trim(), valor: parseFloat(String(q.valor).replace(',', '.')) || 2 };
       });
       var r2 = await sbFetch('POST', '/rest/v1/questoes_abertas', linhas);
       if (!r2.ok) { toast('Erro ao salvar questões: ' + msgErro(await r2.json()), 'error'); return; }
 
-      toast('✅ Prova cadastrada com ' + questoes.length + ' questão(ões)!', 'success');
-      document.getElementById('nomeProva').value = '';
-      questoes = [{ enunciado: '', resposta: '', valor: '2' }];
-      renderizarQuestoes();
+      toast(editandoId ? '✅ Prova atualizada!' : '✅ Prova cadastrada com ' + questoes.length + ' questão(ões)!', 'success');
+      novoForm();
       carregarProvas();
-    } catch (e) {
-      toast('Falha de conexão: ' + e.message, 'error');
-    }
+    } catch (e) { toast('Falha de conexão: ' + e.message, 'error'); }
   }
 
   async function carregarProvas() {
@@ -343,18 +340,15 @@
       var r = await sbFetch('GET', '/rest/v1/avaliacoes?modo_correcao=eq.aberta&select=id,nome,bimestre,numero_questoes,data_prova&order=id.desc');
       if (!r.ok) { lista.innerHTML = '<p style="color:#dc3545;text-align:center;padding:20px;">Erro ao carregar provas.</p>'; return; }
       var data = await r.json();
-      if (!data || data.length === 0) {
-        lista.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Nenhuma prova cadastrada ainda.</p>';
-        return;
-      }
+      if (!data || data.length === 0) { lista.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Nenhuma prova cadastrada ainda.</p>'; return; }
       lista.innerHTML = data.map(function (p) {
         return '<div class="prova-item"><div class="prova-item-info"><strong>' + p.nome + '</strong>' +
           '<div class="prova-item-meta">' + p.numero_questoes + ' questões • ' + p.bimestre + 'º bimestre • ' + p.data_prova + '</div></div>' +
-          '<button class="btn btn-danger btn-sm" onclick="excluirProva(' + p.id + ')">🗑️</button></div>';
+          '<div style="display:flex;gap:6px;">' +
+          '<button class="btn btn-warn btn-sm" onclick="editarProva(' + p.id + ')">✏️</button>' +
+          '<button class="btn btn-danger btn-sm" onclick="excluirProva(' + p.id + ')">🗑️</button></div></div>';
       }).join('');
-    } catch (e) {
-      lista.innerHTML = '<p style="color:#dc3545;text-align:center;padding:20px;">Falha de conexão.</p>';
-    }
+    } catch (e) { lista.innerHTML = '<p style="color:#dc3545;text-align:center;padding:20px;">Falha de conexão.</p>'; }
   }
 
   async function excluirProva(id) {
@@ -364,15 +358,10 @@
       await sbFetch('DELETE', '/rest/v1/avaliacoes?id=eq.' + id);
       toast('Prova excluída!', 'success');
       carregarProvas();
-    } catch (e) {
-      toast('Erro: ' + e.message, 'error');
-    }
+    } catch (e) { toast('Erro: ' + e.message, 'error'); }
   }
 
-  // ===== INÍCIO =====
-  if (token && userEmail) {
-    mostrarPrincipal(userEmail);
-  }
+  if (token && userEmail) { mostrarPrincipal(userEmail); }
 </script>
 
 </body>
