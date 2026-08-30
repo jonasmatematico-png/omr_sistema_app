@@ -512,7 +512,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     return 'image/jpeg';
   }
 
-  Future<Map<String, int?>?> _lerQRDasFolhas(List<String> caminhos) async {
+  // 🔲 Lê TODOS os QRs das folhas e junta: prova (OMRPROVA/OMRALUNO) + aluno (OMRALUNO/OMRCARD)
+  Future<Map<String, int?>> _lerQRDasFolhas(List<String> caminhos) async {
+    int? prova;
+    int? aluno;
     try {
       final scanner = BarcodeScanner();
       for (final caminho in caminhos) {
@@ -521,22 +524,15 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         for (final b in barcodes) {
           final raw = (b.rawValue ?? '').trim();
           if (raw.startsWith('OMRPROVA:')) {
-            final prova = int.tryParse(raw.substring('OMRPROVA:'.length));
-            if (prova != null) {
-              await scanner.close();
-              return {'prova': prova, 'aluno': null};
-            }
-          }
-          if (raw.startsWith('OMRALUNO:')) {
+            prova ??= int.tryParse(raw.substring('OMRPROVA:'.length));
+          } else if (raw.startsWith('OMRALUNO:')) {
             final partes = raw.split(':');
             if (partes.length >= 3) {
-              final prova = int.tryParse(partes[1]);
-              final aluno = int.tryParse(partes[2]);
-              if (prova != null && aluno != null) {
-                await scanner.close();
-                return {'prova': prova, 'aluno': aluno};
-              }
+              prova ??= int.tryParse(partes[1]);
+              aluno ??= int.tryParse(partes[2]);
             }
+          } else if (raw.startsWith('OMRCARD:')) {
+            aluno ??= int.tryParse(raw.substring('OMRCARD:'.length));
           }
         }
       }
@@ -544,7 +540,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     } catch (e) {
       // QR é opcional: se não achar ou falhar, segue o fluxo normal
     }
-    return null;
+    return {'prova': prova, 'aluno': aluno};
   }
 
   Future<List<Map<String, dynamic>>> _chamarIA(
@@ -837,8 +833,8 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
 
       // 🔲 Procura QR Code nas folhas (prova e/ou aluno)
       final qr = await _lerQRDasFolhas(_ultimosCaminhos);
-      final idProvaQR = qr?['prova'];
-      final idAlunoQR = qr?['aluno'];
+      final idProvaQR = qr['prova'];
+      final idAlunoQR = qr['aluno'];
 
       if (idProvaQR != null && idProvaQR != avalId) {
         final rAv = await supabase
