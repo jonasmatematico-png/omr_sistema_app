@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 
 class TelaCorrecaoAberta extends StatefulWidget {
   const TelaCorrecaoAberta({super.key});
@@ -19,12 +20,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
 
   String _provedor = 'groq';
 
-  // Gemini (rotação antiga)
   List<String> _chavesGemini = [];
   int _chaveGeminiAtiva = 0;
   final _keyController = TextEditingController();
 
-  // 🚨 GROQ: time de chaves com rotação automática
   List<String> _chavesGroq = [];
   int _chaveGroqAtiva = 0;
   final _groqKeyController = TextEditingController();
@@ -56,7 +55,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       final prefs = await SharedPreferences.getInstance();
       final provedor = prefs.getString('provedor_ia') ?? 'groq';
 
-      // Gemini
       List<String> chavesG = prefs.getStringList('gemini_api_keys') ?? [];
       if (chavesG.isEmpty) {
         final antiga = prefs.getString('gemini_api_key') ?? '';
@@ -66,7 +64,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         }
       }
 
-      // Groq (migra chave antiga e carrega time)
       List<String> chavesR = prefs.getStringList('groq_api_keys') ?? [];
       if (chavesR.isEmpty) {
         final antigaGroq = prefs.getString('groq_api_key') ?? '';
@@ -140,7 +137,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       _chaveGroqAtiva = 0;
     });
     await prefs.setStringList('groq_api_keys', _chavesGroq);
-    await prefs.setString('groq_api_key', k); // mantém compatibilidade
+    await prefs.setString('groq_api_key', k);
     _groqKeyController.clear();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -459,7 +456,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     sb.writeln(
       '[{"numero":1,"transcricao":"...","nota_sugerida":1.5,"justificativa":"...","revisar":false}]',
     );
-
     sb.writeln('Cada nota_sugerida deve ficar entre 0 e o valor da questão.');
     final comImagem = questoes
         .where((q) => '${q['imagem_url'] ?? ''}'.isNotEmpty)
@@ -514,6 +510,41 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     if (u.endsWith('.webp')) return 'image/webp';
     if (u.endsWith('.gif')) return 'image/gif';
     return 'image/jpeg';
+  }
+
+  Future<Map<String, int?>?> _lerQRDasFolhas(List<String> caminhos) async {
+    try {
+      final scanner = BarcodeScanner();
+      for (final caminho in caminhos) {
+        final input = InputImage.fromFilePath(caminho);
+        final barcodes = await scanner.processImage(input);
+        for (final b in barcodes) {
+          final raw = (b.rawValue ?? '').trim();
+          if (raw.startsWith('OMRPROVA:')) {
+            final prova = int.tryParse(raw.substring('OMRPROVA:'.length));
+            if (prova != null) {
+              await scanner.close();
+              return {'prova': prova, 'aluno': null};
+            }
+          }
+          if (raw.startsWith('OMRALUNO:')) {
+            final partes = raw.split(':');
+            if (partes.length >= 3) {
+              final prova = int.tryParse(partes[1]);
+              final aluno = int.tryParse(partes[2]);
+              if (prova != null && aluno != null) {
+                await scanner.close();
+                return {'prova': prova, 'aluno': aluno};
+              }
+            }
+          }
+        }
+      }
+      await scanner.close();
+    } catch (e) {
+      // QR é opcional: se não achar ou falhar, segue o fluxo normal
+    }
+    return null;
   }
 
   Future<List<Map<String, dynamic>>> _chamarIA(
@@ -697,8 +728,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
     });
 
     Object? ultimoErro;
-
-    // 🚨 ROTAÇÃO DE CHAVES GROQ
     for (int k = 0; k < _chavesGroq.length; k++) {
       final indice = (_chaveGroqAtiva + k) % _chavesGroq.length;
       final chave = _chavesGroq[indice];
@@ -718,7 +747,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
               )
               .timeout(const Duration(seconds: 120));
 
-          // 429 = cota excedida → pula pra próxima
           if (response.statusCode == 429) {
             ultimoErro = 'Chave ${indice + 1} sem cota (429).';
             trocarChave = true;
@@ -728,7 +756,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
             throw Exception('Groq ${response.statusCode}: ${response.body}');
           }
 
-          // Sucesso: memoriza a chave ativa
           if (_chaveGroqAtiva != indice && mounted) {
             setState(() => _chaveGroqAtiva = indice);
           }
@@ -753,7 +780,6 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         );
       }
     }
-
     throw Exception('Todas as chaves Groq falharam: $ultimoErro');
   }
 
@@ -808,18 +834,75 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         return;
       }
       _ultimosCaminhos = List<String>.from(result.images!);
+
+      // 🔲 Procura QR Code nas folhas (prova e/ou aluno)
+      final qr = await _lerQRDasFolhas(_ultimosCaminhos);
+      final idProvaQR = qr?['prova'];
+      final idAlunoQR = qr?['aluno'];
+
+      if (idProvaQR != null && idProvaQR != avalId) {
+        final rAv = await supabase
+            .from('avaliacoes')
+            .select('nome')
+            .eq('id', idProvaQR)
+            .maybeSingle();
+        final nomeAv = rAv == null ? 'ID $idProvaQR' : '${rAv['nome']}';
+        if (mounted) {
+          setState(() => avalId = idProvaQR);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🔲 Prova reconhecida pelo QR: $nomeAv'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      }
+
+      Map<String, dynamic> alunoEfetivo = aluno;
+      if (idAlunoQR != null && idAlunoQR != (aluno['id'] as int?)) {
+        final rAl = await supabase
+            .from('alunos')
+            .select('*')
+            .eq('id', idAlunoQR)
+            .maybeSingle();
+        if (rAl != null) {
+          alunoEfetivo = Map<String, dynamic>.from(rAl);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '🔲 Aluno reconhecido pelo QR: ${alunoEfetivo['nome_completo']}',
+                ),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        }
+      }
+      final idAlunoEfetivo = alunoEfetivo['id'] as int?;
+      if (idAlunoEfetivo == null || idAlunoEfetivo == -1) {
+        throw Exception(
+          'QR do aluno não encontrado. Toque no aluno na lista ou use folhas com QR do aluno.',
+        );
+      }
+
+      final idAvalEfetivo = idProvaQR ?? avalId;
+      if (idAvalEfetivo == null) {
+        throw Exception('Escolha a prova acima — ou use folhas com QR.');
+      }
+
       final qs = await supabase
           .from('questoes_abertas')
           .select('*')
-          .eq('id_avaliacao', avalId!)
+          .eq('id_avaliacao', idAvalEfetivo)
           .order('numero');
       final questoes = List<Map<String, dynamic>>.from(qs);
       if (questoes.isEmpty)
         throw Exception('Esta prova não tem questões cadastradas.');
       final sugestoes = await _chamarIA(_ultimosCaminhos, questoes);
       setState(() {
-        _nomeAlunoRevisao = '${aluno['nome_completo']}';
-        _idAlunoRevisao = aluno['id'] as int;
+        _nomeAlunoRevisao = '${alunoEfetivo['nome_completo']}';
+        _idAlunoRevisao = alunoEfetivo['id'] as int;
       });
       await _prepararRevisao(questoes, sugestoes);
     } catch (e) {
@@ -830,6 +913,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         );
       }
     }
+  }
+
+  void _corrigirPorQR() {
+    _corrigirAluno({'id': -1, 'nome_completo': '(QR)'});
   }
 
   Future<void> _recorrigir() async {
@@ -1279,16 +1366,29 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
               _carregarAlunos();
             },
           ),
-          if (avalId != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: _editarRegras,
-                icon: const Icon(Icons.edit, size: 18),
-                label: const Text('✏️ Regras da prova'),
-                style: TextButton.styleFrom(foregroundColor: Colors.deepOrange),
+          Row(
+            children: [
+              if (avalId != null)
+                Expanded(
+                  child: TextButton.icon(
+                    onPressed: _editarRegras,
+                    icon: const Icon(Icons.edit, size: 18),
+                    label: const Text('✏️ Regras da prova'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.deepOrange,
+                    ),
+                  ),
+                ),
+              Expanded(
+                child: TextButton.icon(
+                  onPressed: _corrigirPorQR,
+                  icon: const Icon(Icons.qr_code_scanner, size: 18),
+                  label: const Text('🔲 Escanear com QR do aluno'),
+                  style: TextButton.styleFrom(foregroundColor: Colors.teal),
+                ),
               ),
-            ),
+            ],
+          ),
         ],
       ),
     );

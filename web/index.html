@@ -48,7 +48,6 @@
     .section-title { font-size: 16px; font-weight: 600; color: #008080; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid #e0e0e0; }
     .loading { text-align: center; padding: 40px; color: #666; }
     .banner-edit { background: #fff3cd; border: 1px solid #ffc107; border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; }
-    .help-text { font-size: 11px; color: #888; margin-top: 4px; }
     .img-status { font-size: 12px; margin-top: 4px; color: #008080; font-weight: 600; }
   </style>
 </head>
@@ -106,6 +105,16 @@
       <div id="questoesContainer"></div>
     </div>
     <button id="btnSalvar" class="btn btn-primary" style="width: 100%; padding: 14px;" onclick="salvarProva()">💾 SALVAR PROVA ABERTA</button>
+
+    <div class="card" style="margin-top: 24px;">
+      <div class="section-title">🔲 QR dos alunos (para imprimir)</div>
+      <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+        <div class="form-group"><label>Turma</label><select id="selTurmaQR" onchange="carregarAlunosQR()"></select></div>
+        <div class="form-group"><label>Prova</label><select id="selProvaQR"></select></div>
+      </div>
+      <div id="alunosQRLista"></div>
+    </div>
+
     <div class="card" style="margin-top: 24px;">
       <div class="section-title">Provas cadastradas</div>
       <div id="provasLista"><div class="loading">Carregando...</div></div>
@@ -127,9 +136,10 @@
     </div>
   </div>
 </div>
+
 <div id="modalQR" class="modal">
   <div class="modal-content" style="text-align: center;">
-    <div class="modal-header"><h3>🔲 QR Code da prova</h3><button class="btn btn-sm" onclick="fecharModalQR()">✕</button></div>
+    <div class="modal-header"><h3>🔲 QR Code</h3><button class="btn btn-sm" onclick="fecharModalQR()">✕</button></div>
     <p style="font-size: 13px; margin-bottom: 12px;" id="qrNome"></p>
     <img id="qrImg" style="width: 240px; height: 240px; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" alt="QR Code">
     <p style="font-size: 12px; color: #888; margin: 12px 0;">Clique com o botão direito na imagem → <b>Salvar imagem</b>, e cole no canto da prova no Word.</p>
@@ -218,6 +228,7 @@
     document.getElementById('userEmail').textContent = email;
     novoForm();
     carregarProvas();
+    carregarSelectsQR();
   }
 
   function novaQuestao() { return { enunciado: '', resposta: '', valor: '2', imagemUrl: null, file: null }; }
@@ -296,7 +307,6 @@
   async function uploadImagem(file) {
     var ext = (file.name.split('.').pop() || 'png').toLowerCase();
     var path = 'q_' + Date.now() + '_' + Math.floor(Math.random() * 10000) + '.' + ext;
-    
     async function tentar(bearer) {
       return await fetch(SUPABASE_URL + '/storage/v1/object/enunciados/' + path, {
         method: 'POST',
@@ -316,6 +326,50 @@
     return SUPABASE_URL + '/storage/v1/object/public/enunciados/' + path;
   }
 
+  // ===== QR =====
+  function mostrarQR(id, nome) {
+    var dados = 'OMRPROVA:' + id;
+    var url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(dados);
+    document.getElementById('qrNome').textContent = 'Prova: ' + nome;
+    document.getElementById('qrImg').src = url;
+    document.getElementById('qrLink').href = url;
+    document.getElementById('modalQR').classList.add('active');
+  }
+  function mostrarQRAluno(provaId, alunoId, nome) {
+    var dados = 'OMRALUNO:' + provaId + ':' + alunoId;
+    var url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(dados);
+    document.getElementById('qrNome').textContent = 'Aluno: ' + nome;
+    document.getElementById('qrImg').src = url;
+    document.getElementById('qrLink').href = url;
+    document.getElementById('modalQR').classList.add('active');
+  }
+  function fecharModalQR() { document.getElementById('modalQR').classList.remove('active'); }
+
+  async function carregarSelectsQR() {
+    try {
+      var rt = await sbFetch('GET', '/rest/v1/turmas?select=id,nome&order=nome.asc');
+      var turmas = await rt.json();
+      var rp = await sbFetch('GET', '/rest/v1/avaliacoes?modo_correcao=eq.aberta&select=id,nome&order=id.desc');
+      var provas = await rp.json();
+      document.getElementById('selTurmaQR').innerHTML = turmas.map(function (t) { return '<option value="' + t.id + '">' + t.nome + '</option>'; }).join('');
+      document.getElementById('selProvaQR').innerHTML = provas.map(function (p) { return '<option value="' + p.id + '">' + p.nome + '</option>'; }).join('');
+      carregarAlunosQR();
+    } catch (e) { /* silencioso */ }
+  }
+
+  async function carregarAlunosQR() {
+    var turmaId = document.getElementById('selTurmaQR').value;
+    var lista = document.getElementById('alunosQRLista');
+    if (!turmaId) { lista.innerHTML = ''; return; }
+    var r = await sbFetch('GET', '/rest/v1/alunos?id_turma=eq.' + turmaId + '&select=id,nome_completo,numero_chamada&order=numero_chamada.asc');
+    var alunos = await r.json();
+    lista.innerHTML = alunos.map(function (a) {
+      return '<div class="prova-item"><div class="prova-item-info"><strong>' + a.numero_chamada + '. ' + a.nome_completo + '</strong></div>' +
+        '<button class="btn btn-primary btn-sm" onclick="mostrarQRAluno(parseInt(document.getElementById(\'selProvaQR\').value), ' + a.id + ', \'' + String(a.nome_completo).replace(/'/g, '') + '\')">🔲</button></div>';
+    }).join('');
+  }
+
+  // ===== EDITAR =====
   async function editarProva(id) {
     try {
       var r1 = await sbFetch('GET', '/rest/v1/avaliacoes?id=eq.' + id + '&select=*');
@@ -349,7 +403,6 @@
       if (!questoes[i].enunciado.trim()) { toast('Questão ' + (i + 1) + ' sem enunciado!', 'error'); return; }
     }
     try {
-      // 1) Envia as imagens novas (se houver)
       for (var k = 0; k < questoes.length; k++) {
         if (questoes[k].file) {
           toast('Enviando imagem da questão ' + (k + 1) + '...', 'info');
@@ -391,16 +444,6 @@
     } catch (e) { toast('Falha: ' + e.message, 'error'); }
   }
 
-  function mostrarQR(id, nome) {
-    var dados = 'OMRPROVA:' + id;
-    var url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(dados);
-    document.getElementById('qrNome').textContent = 'Prova: ' + nome;
-    document.getElementById('qrImg').src = url;
-    document.getElementById('qrLink').href = url;
-    document.getElementById('modalQR').classList.add('active');
-  }
-  function fecharModalQR() { document.getElementById('modalQR').classList.remove('active'); }
-  
   async function carregarProvas() {
     var lista = document.getElementById('provasLista');
     lista.innerHTML = '<div class="loading">Carregando...</div>';
@@ -412,12 +455,11 @@
       lista.innerHTML = data.map(function (p) {
         return '<div class="prova-item"><div class="prova-item-info"><strong>' + p.nome + '</strong>' +
           '<div class="prova-item-meta">' + p.numero_questoes + ' questões • ' + p.bimestre + 'º bimestre • ' + p.data_prova + '</div></div>' +
-          
           '<div style="display:flex;gap:6px;">' +
-          '<button class="btn btn-primary btn-sm" onclick="mostrarQR(' + p.id + ', \'' + p.nome.replace(/'/g, "") + '\')">🔲</button>' +
+          '<button class="btn btn-primary btn-sm" onclick="mostrarQR(' + p.id + ', \'' + String(p.nome).replace(/'/g, '') + '\')">🔲</button>' +
           '<button class="btn btn-warn btn-sm" onclick="editarProva(' + p.id + ')">✏️</button>' +
           '<button class="btn btn-danger btn-sm" onclick="excluirProva(' + p.id + ')">🗑️</button></div></div>';
-        }).join('');
+      }).join('');
     } catch (e) { lista.innerHTML = '<p style="color:#dc3545;text-align:center;padding:20px;">Falha de conexão.</p>'; }
   }
 
