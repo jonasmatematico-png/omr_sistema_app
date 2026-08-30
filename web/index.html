@@ -54,10 +54,16 @@
     .cartao-nome { font-size: 11px; font-weight: 700; margin-top: 4px; }
     .cartao-turma { font-size: 10px; color: #666; }
     #cartoesGrid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+
+    @page { size: A4; margin: 1cm; }
     @media print {
       body * { visibility: hidden; }
       #areaImpressao, #areaImpressao * { visibility: visible; }
-      #areaImpressao { position: absolute; left: 0; top: 0; width: 100%; }
+      #modalCartoes { display: block; position: absolute; left: 0; top: 0; width: 100%; background: none; }
+      #modalCartoes .modal-content { max-width: 100%; width: 100%; max-height: none; overflow: visible; box-shadow: none; padding: 0; }
+      #cartoesGrid { display: block; }
+      .cartao { display: inline-block; vertical-align: top; margin: 6px; break-inside: avoid; page-break-inside: avoid; }
     }
   </style>
 </head>
