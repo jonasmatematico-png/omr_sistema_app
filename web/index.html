@@ -390,10 +390,13 @@
     try {
       var rt = await sbFetch('GET', '/rest/v1/turmas?select=id,nome&order=nome.asc');
       var turmas = await rt.json();
-      var rp = await sbFetch('GET', '/rest/v1/avaliacoes?modo_correcao=eq.aberta&select=id,nome&order=id.desc');
+      var rp = await sbFetch('GET', '/rest/v1/avaliacoes?select=id,nome,modo_correcao&order=id.desc');
       var provas = await rp.json();
       document.getElementById('selTurmaQR').innerHTML = turmas.map(function (t) { return '<option value="' + t.id + '">' + t.nome + '</option>'; }).join('');
-      document.getElementById('selProvaQR').innerHTML = provas.map(function (p) { return '<option value="' + p.id + '">' + p.nome + '</option>'; }).join('');
+      document.getElementById('selProvaQR').innerHTML = provas.map(function (p) {
+        var tag = p.modo_correcao === 'aberta' ? ' (aberta)' : ' (múltipla escolha)';
+        return '<option value="' + p.id + '">' + p.nome + tag + '</option>';
+      }).join('');
       carregarAlunosQR();
     } catch (e) { /* silencioso */ }
   }
