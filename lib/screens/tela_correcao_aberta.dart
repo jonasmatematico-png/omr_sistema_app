@@ -44,6 +44,7 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
   final Map<int, TextEditingController> _notaControllers = {};
   List<String> _ultimosCaminhos = [];
   String _disciplinaAtual = 'Matemática';
+  bool _filaQR = false;
 
   @override
   void initState() {
@@ -829,7 +830,10 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       final scanner = DocumentScanner(options: options);
       final result = await scanner.scanDocument();
       if (result.images == null || result.images!.isEmpty) {
-        setState(() => processando = false);
+        setState(() {
+          processando = false;
+          _filaQR = false;
+        });
         return;
       }
       _ultimosCaminhos = List<String>.from(result.images!);
@@ -920,11 +924,19 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ $e'), backgroundColor: Colors.red),
         );
+        if (_filaQR) {
+          Future.delayed(const Duration(milliseconds: 900), () {
+            if (mounted && _filaQR) {
+              _corrigirAluno({'id': -1, 'nome_completo': '(QR)'});
+            }
+          });
+        }
       }
     }
   }
 
   void _corrigirPorQR() {
+    setState(() => _filaQR = true);
     _corrigirAluno({'id': -1, 'nome_completo': '(QR)'});
   }
 
@@ -1218,6 +1230,13 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
           ),
         );
         setState(() => emRevisao = false);
+        if (_filaQR) {
+          Future.delayed(const Duration(milliseconds: 700), () {
+            if (mounted && _filaQR) {
+              _corrigirAluno({'id': -1, 'nome_completo': '(QR)'});
+            }
+          });
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -1700,11 +1719,14 @@ class _TelaCorrecaoAbertaState extends State<TelaCorrecaoAberta> {
       ),
       floatingActionButton: emRevisao
           ? FloatingActionButton.extended(
-              onPressed: () => setState(() => emRevisao = false),
-              backgroundColor: Colors.grey,
+              onPressed: () => setState(() {
+                emRevisao = false;
+                _filaQR = false;
+              }),
+              backgroundColor: _filaQR ? Colors.red : Colors.grey,
               foregroundColor: Colors.white,
-              icon: const Icon(Icons.arrow_back),
-              label: const Text('Voltar'),
+              icon: Icon(_filaQR ? Icons.stop : Icons.arrow_back),
+              label: Text(_filaQR ? 'PARAR FILA' : 'Voltar'),
             )
           : null,
     );

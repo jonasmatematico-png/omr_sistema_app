@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart';
+import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import '../context/app_state.dart';
 import '../models/aluno_model.dart';
 import '../models/avaliacao_model.dart';
@@ -40,6 +41,37 @@ class _TelaAlunosState extends State<TelaAlunos> {
         appState.carregarAlunosDaTurma(appState.turmaSelecionada!.id);
       }
     });
+  }
+
+  // 🔲 Lê TODOS os QRs das folhas e junta: prova (OMRPROVA/OMRALUNO) + aluno (OMRALUNO/OMRCARD)
+  Future<Map<String, int?>> _lerQRDasFolhas(List<String> caminhos) async {
+    int? prova;
+    int? aluno;
+    try {
+      final scanner = BarcodeScanner();
+      for (final caminho in caminhos) {
+        final input = InputImage.fromFilePath(caminho);
+        final barcodes = await scanner.processImage(input);
+        for (final b in barcodes) {
+          final raw = (b.rawValue ?? '').trim();
+          if (raw.startsWith('OMRPROVA:')) {
+            prova ??= int.tryParse(raw.substring('OMRPROVA:'.length));
+          } else if (raw.startsWith('OMRALUNO:')) {
+            final partes = raw.split(':');
+            if (partes.length >= 3) {
+              prova ??= int.tryParse(partes[1]);
+              aluno ??= int.tryParse(partes[2]);
+            }
+          } else if (raw.startsWith('OMRCARD:')) {
+            aluno ??= int.tryParse(raw.substring('OMRCARD:'.length));
+          }
+        }
+      }
+      await scanner.close();
+    } catch (e) {
+      // QR é opcional: se não achar ou falhar, segue o fluxo normal
+    }
+    return {'prova': prova, 'aluno': aluno};
   }
 
   double _pesoEscola(String nivel) {
@@ -311,9 +343,53 @@ class _TelaAlunosState extends State<TelaAlunos> {
       if (result.images != null && result.images!.isNotEmpty) {
         File fotoRecortada = File(result.images!.first);
 
-        int indexAlvo =
-            indexEspecifico ??
-            appState.alunos.indexWhere((a) => a.estaPendente);
+        // 🔲 Procura QR Code na folha (prova e/ou aluno)
+        final qr = await _lerQRDasFolhas([fotoRecortada.path]);
+        final idProvaQR = qr['prova'];
+        final idAlunoQR = qr['aluno'];
+
+        // Se achou QR da prova diferente da atual, recarrega o gabarito
+        if (idProvaQR != null &&
+            idProvaQR != appState.avaliacaoSelecionada?.id) {
+          try {
+            final rAv = await Supabase.instance.client
+                .from('avaliacoes')
+                .select('nome')
+                .eq('id', idProvaQR)
+                .maybeSingle();
+            final nomeAv = rAv == null ? 'ID $idProvaQR' : '${rAv['nome']}';
+            await appState.carregarGabarito(idProvaQR);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('🔲 Prova reconhecida pelo QR: $nomeAv'),
+                  backgroundColor: Colors.blue,
+                ),
+              );
+            }
+          } catch (e) {
+            print('⚠️ Erro ao carregar prova do QR: $e');
+          }
+        }
+
+        // Aluno: QR primeiro; senão, o próximo pendente da fila
+        int indexAlvo = indexEspecifico ?? -1;
+        if (indexAlvo == -1 && idAlunoQR != null) {
+          indexAlvo = appState.alunos.indexWhere((a) => a.id == idAlunoQR);
+          if (indexAlvo != -1 && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '🔲 Aluno reconhecido pelo QR: ${appState.alunos[indexAlvo].nome}',
+                ),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        }
+        if (indexAlvo == -1) {
+          indexAlvo = appState.alunos.indexWhere((a) => a.estaPendente);
+        }
 
         if (indexAlvo != -1 && mounted) {
           Aluno alunoAlvo = appState.alunos[indexAlvo];
@@ -478,6 +554,240 @@ class _TelaAlunosState extends State<TelaAlunos> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Erro na câmera: $e"),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // 🔲 Modo QR: escaneia, carrega o gabarito da prova do QR e identifica o aluno — tudo sozinho!
+  Future<void> _abrirCameraPorQR() async {
+    final appState = Provider.of<AppState>(context, listen: false);
+
+    try {
+      DocumentScannerOptions options = DocumentScannerOptions(
+        mode: ScannerMode.full,
+        pageLimit: 1,
+        isGalleryImport: false,
+      );
+      final documentScanner = DocumentScanner(options: options);
+      DocumentScanningResult result = await documentScanner.scanDocument();
+
+      if (result.images == null || result.images!.isEmpty) return;
+      File fotoRecortada = File(result.images!.first);
+
+      final qr = await _lerQRDasFolhas([fotoRecortada.path]);
+      final idProvaQR = qr['prova'];
+      final idAlunoQR = qr['aluno'];
+
+      // Prova: QR primeiro; senão, a já selecionada; senão, erro
+      int? idProva = idProvaQR ?? appState.avaliacaoSelecionada?.id;
+      if (idProva == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '⚠️ Nem gabarito carregado, nem QR de prova na foto!',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Carrega o gabarito da prova do QR (se ainda não é a atual)
+      if (appState.avaliacaoSelecionada?.id != idProva ||
+          appState.avaliacaoSelecionada!.gabarito.isEmpty) {
+        try {
+          final rAv = await Supabase.instance.client
+              .from('avaliacoes')
+              .select('nome')
+              .eq('id', idProva)
+              .maybeSingle();
+          final nomeAv = rAv == null ? 'ID $idProva' : '${rAv['nome']}';
+          await appState.carregarGabarito(idProva);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('🔲 Gabarito carregado pelo QR: $nomeAv'),
+                backgroundColor: Colors.blue,
+              ),
+            );
+          }
+        } catch (e) {
+          print('⚠️ Erro ao carregar gabarito do QR: $e');
+        }
+      }
+
+      if (appState.avaliacaoSelecionada == null ||
+          appState.avaliacaoSelecionada!.gabarito.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Não consegui carregar o gabarito desta prova!'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Aluno: no modo QR, precisa do QR
+      if (idAlunoQR == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                '⚠️ QR do aluno não encontrado! Cole o QR na prova ou use o cartão laminado.',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      int indexAlvo = appState.alunos.indexWhere((a) => a.id == idAlunoQR);
+      if (indexAlvo == -1) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ O aluno do QR não está na turma selecionada!'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '🔲 Aluno reconhecido: ${appState.alunos[indexAlvo].nome}',
+            ),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+
+      Aluno alunoAlvo = appState.alunos[indexAlvo];
+      setState(() => processandoFoto = true);
+      List<String> respostasParaRevisar = [];
+
+      try {
+        String urlServidor = appState.ipServidor;
+        await http
+            .get(Uri.parse(urlServidor))
+            .timeout(const Duration(seconds: 15));
+
+        var request = http.MultipartRequest(
+          'POST',
+          Uri.parse("$urlServidor/corrigir"),
+        );
+
+        request.files.add(
+          await http.MultipartFile.fromPath('image', fotoRecortada.path),
+        );
+
+        request.fields['gabarito'] = jsonEncode(
+          appState.avaliacaoSelecionada!.gabarito,
+        );
+        request.fields['id_aluno'] = alunoAlvo.id.toString();
+        request.fields['id_avaliacao'] = appState.avaliacaoSelecionada!.id
+            .toString();
+
+        var response = await request.send().timeout(
+          const Duration(seconds: 90),
+        );
+
+        if (response.statusCode == 200) {
+          var respStr = await response.stream.bytesToString();
+          var jsonResp = jsonDecode(respStr);
+
+          if (jsonResp['sucesso'] == true && jsonResp['resultado'] != null) {
+            if (jsonResp['resultado']['respostas'] != null) {
+              respostasParaRevisar = List<String>.from(
+                jsonResp['resultado']['respostas'],
+              );
+            }
+          } else {
+            if (jsonResp['resultado']?['respostas'] != null) {
+              respostasParaRevisar = List<String>.from(
+                jsonResp['resultado']['respostas'],
+              );
+            }
+          }
+        }
+      } catch (e) {
+        print("⚠️ Erro no envio: $e");
+      }
+
+      if (respostasParaRevisar.isEmpty) {
+        respostasParaRevisar = List.filled(
+          appState.avaliacaoSelecionada!.gabarito.length,
+          "",
+        );
+      }
+
+      double notaExataComPesos = 0.0;
+      final gabarito = appState.avaliacaoSelecionada!.gabarito;
+      final niveis = appState.avaliacaoSelecionada!.niveis;
+      final bool ehSaeb = _ehSaeb();
+      final double pesoNormal = gabarito.isNotEmpty ? 10 / gabarito.length : 1;
+
+      for (int i = 0; i < respostasParaRevisar.length; i++) {
+        if (i < gabarito.length && i < niveis.length) {
+          double peso = ehSaeb ? _pesoEscola(niveis[i]) : pesoNormal;
+          bool respostaValida = respostasParaRevisar[i].isNotEmpty;
+          bool acertou =
+              respostaValida &&
+              (respostasParaRevisar[i].trim().toUpperCase() ==
+                  gabarito[i].trim().toUpperCase());
+          if (acertou) {
+            notaExataComPesos += peso;
+          }
+        }
+      }
+
+      if (notaExataComPesos > 10) notaExataComPesos = 10;
+
+      setState(() => processandoFoto = false);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => TelaConfirmacao(
+              fotoRecortada: fotoRecortada,
+              nomeAluno: alunoAlvo.nome,
+              respostasDetectadas: respostasParaRevisar,
+              onConfirmar: (_, respostasConfirmadas) {
+                setState(() {
+                  alunoAlvo.status = "Corrigido";
+                  alunoAlvo.notaFinal = (notaExataComPesos + 0.5).toInt();
+                  alunoAlvo.notaExata = notaExataComPesos;
+                  alunoAlvo.respostas = respostasConfirmadas;
+                });
+                _salvarCorrecaoInteligente(
+                  alunoAlvo,
+                  notaExataComPesos,
+                  respostasConfirmadas,
+                );
+              },
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print("❌ Erro geral no QR: $e");
+      setState(() => processandoFoto = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Erro no QR: $e"),
             backgroundColor: Colors.red,
           ),
         );
@@ -830,11 +1140,14 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                 ),
                                 icon: const Icon(
                                   Icons.playlist_add_check,
-                                  size: 22,
+                                  size: 18,
                                 ),
                                 label: const Text(
                                   "GABARITO MANUAL",
-                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
                                 ),
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
@@ -851,19 +1164,47 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                 ),
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            const SizedBox(width: 8),
                             Expanded(
-                              flex: 2,
+                              child: ElevatedButton.icon(
+                                onPressed: processandoFoto
+                                    ? null
+                                    : _abrirCameraPorQR,
+                                icon: const Icon(
+                                  Icons.qr_code_scanner,
+                                  size: 18,
+                                ),
+                                label: const Text(
+                                  "QR ALUNO",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.teal,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 14,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
                               child: ElevatedButton.icon(
                                 onPressed: processandoFoto
                                     ? null
                                     : () => _abrirCameraCorrecao(),
-                                icon: const Icon(Icons.camera_alt, size: 24),
+                                icon: const Icon(Icons.camera_alt, size: 18),
                                 label: const Text(
-                                  "LER PROVAS EM FILA",
+                                  "FILA",
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
-                                    fontSize: 13,
+                                    fontSize: 11,
                                   ),
                                 ),
                                 style: ElevatedButton.styleFrom(
@@ -872,7 +1213,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
                                   padding: const EdgeInsets.symmetric(
                                     vertical: 14,
                                   ),
-                                  elevation: 4,
+                                  elevation: 2,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10),
                                   ),
