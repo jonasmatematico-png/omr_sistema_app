@@ -15,6 +15,10 @@ class _TelaGabaritoState extends State<TelaGabarito> {
   late List<String> _niveisLocal;
   late List<String> _descritoresLocal;
 
+  // 🔓 LIMITE LIVRE: de 1 a 30 questões (a folha OMR tem 30 bolinhas)
+  static const int MIN_QUESTOES = 1;
+  static const int MAX_QUESTOES = 30;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +39,44 @@ class _TelaGabaritoState extends State<TelaGabarito> {
         _descritoresLocal = List.generate(qtd, (index) => '');
       }
       setState(() {});
+    });
+  }
+
+  // ➕ ADICIONA UMA QUESTÃO
+  void _addQuestao() {
+    if (_gabaritoLocal.length >= MAX_QUESTOES) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Máximo de 30 questões (limite da folha OMR)!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _gabaritoLocal.add('A');
+      _pesosLocal.add(1.0);
+      _niveisLocal.add('Básico');
+      _descritoresLocal.add('');
+    });
+  }
+
+  // ➖ REMOVE A ÚLTIMA QUESTÃO
+  void _removeQuestao() {
+    if (_gabaritoLocal.length <= MIN_QUESTOES) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Mínimo de 1 questão!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _gabaritoLocal.removeLast();
+      _pesosLocal.removeLast();
+      _niveisLocal.removeLast();
+      _descritoresLocal.removeLast();
     });
   }
 
@@ -92,6 +134,41 @@ class _TelaGabaritoState extends State<TelaGabarito> {
           ? const Center(child: CircularProgressIndicator())
           : Column(
               children: [
+                // 🔓 NOVO: CONTROLE DE QUANTIDADE (1 a 30)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  color: Colors.indigo.shade100,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle, size: 32),
+                        color: Colors.indigo,
+                        tooltip: 'Remover questão',
+                        onPressed: _removeQuestao,
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '${_gabaritoLocal.length} questões',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.indigo.shade900,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, size: 32),
+                        color: Colors.indigo,
+                        tooltip: 'Adicionar questão',
+                        onPressed: _addQuestao,
+                      ),
+                    ],
+                  ),
+                ),
                 Container(
                   padding: const EdgeInsets.all(16),
                   color: Colors.indigo.shade50,
@@ -101,7 +178,7 @@ class _TelaGabaritoState extends State<TelaGabarito> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Toque em uma questão para alterar a resposta.',
+                          'Toque em uma questão para alterar a resposta. Use ➕/➖ para definir a quantidade (1 a 30).',
                           style: TextStyle(
                             color: Colors.indigo.shade900,
                             fontWeight: FontWeight.w500,

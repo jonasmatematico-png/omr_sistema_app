@@ -22,6 +22,10 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
   late List<TextEditingController> _descritorControllers;
   bool _estaSalvando = false;
 
+  // 🔓 LIMITE LIVRE: 1 a 30 questões (folha OMR tem 30 bolinhas)
+  static const int MIN_QUESTOES = 1;
+  static const int MAX_QUESTOES = 30;
+
   final List<String> _opcoesResposta = ['A', 'B', 'C', 'D', 'E'];
   final List<String> _opcoesNivel = ['Básico', 'Intermediário', 'Avançado'];
 
@@ -32,7 +36,10 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
         ? widget.avaliacao.numeroQuestoes
         : 10;
 
-    // 🚨 BLINDAGEM CONTRA NULL: Garante que sempre sejam listas válidas
+    // Limita ao máximo da folha OMR
+    if (_numeroQuestoes > MAX_QUESTOES) _numeroQuestoes = MAX_QUESTOES;
+    if (_numeroQuestoes < MIN_QUESTOES) _numeroQuestoes = MIN_QUESTOES;
+
     final gabaritoRaw = widget.avaliacao.gabarito;
     final pesosRaw = widget.avaliacao.pesos;
     final niveisRaw = widget.avaliacao.niveis;
@@ -57,7 +64,6 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
           : descritoresRaw,
     );
 
-    // Ajusta o tamanho das listas se o número de questões for diferente
     while (_respostas.length < _numeroQuestoes) {
       _respostas.add('A');
       _pesos.add(1.0);
@@ -89,6 +95,10 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
   }
 
   void _atualizarNumeroQuestoes(int novoNumero) {
+    // 🔓 Trava nos limites da folha OMR
+    if (novoNumero < MIN_QUESTOES) novoNumero = MIN_QUESTOES;
+    if (novoNumero > MAX_QUESTOES) novoNumero = MAX_QUESTOES;
+
     setState(() {
       _numeroQuestoes = novoNumero;
       while (_respostas.length < _numeroQuestoes) {
@@ -108,6 +118,34 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
         _descritorControllers.removeLast().dispose();
       }
     });
+  }
+
+  // ➕ ADICIONA UMA QUESTÃO
+  void _addQuestao() {
+    if (_numeroQuestoes >= MAX_QUESTOES) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Máximo de 30 questões (limite da folha OMR)!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    _atualizarNumeroQuestoes(_numeroQuestoes + 1);
+  }
+
+  // ➖ REMOVE UMA QUESTÃO
+  void _removeQuestao() {
+    if (_numeroQuestoes <= MIN_QUESTOES) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Mínimo de 1 questão!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    _atualizarNumeroQuestoes(_numeroQuestoes - 1);
   }
 
   Future<void> _salvarGabarito() async {
@@ -185,32 +223,63 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
             )
           : Column(
               children: [
+                // 🔓 NOVO: CONTROLE DE QUANTIDADE (1 a 30) COM BOTÕES +/-
                 Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.indigo.shade50,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                  color: Colors.indigo.shade100,
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'Questões:',
+                      IconButton(
+                        icon: const Icon(Icons.remove_circle, size: 36),
+                        color: Colors.indigo,
+                        tooltip: 'Remover questão',
+                        onPressed: _removeQuestao,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        '$_numeroQuestoes questões',
                         style: TextStyle(
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
-                          fontSize: 15,
+                          color: Colors.indigo.shade900,
                         ),
                       ),
                       const SizedBox(width: 12),
-                      DropdownButton<int>(
-                        value: _numeroQuestoes,
-                        items: [5, 10, 15, 20, 25, 30, 35, 40, 45, 50]
-                            .map(
-                              (n) =>
-                                  DropdownMenuItem(value: n, child: Text('$n')),
-                            )
-                            .toList(),
-                        onChanged: (value) {
-                          if (value != null) _atualizarNumeroQuestoes(value);
-                        },
+                      IconButton(
+                        icon: const Icon(Icons.add_circle, size: 36),
+                        color: Colors.indigo,
+                        tooltip: 'Adicionar questão',
+                        onPressed: _addQuestao,
                       ),
-                      const Spacer(),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  color: Colors.indigo.shade50,
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline,
+                        color: Colors.indigo,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Use ➕/➖ para definir a quantidade (1 a 30). A folha OMR suporta até 30 questões.',
+                          style: TextStyle(
+                            color: Colors.indigo.shade900,
+                            fontWeight: FontWeight.w500,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 10,
@@ -226,6 +295,7 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             color: Colors.indigo,
+                            fontSize: 12,
                           ),
                         ),
                       ),
@@ -401,9 +471,9 @@ class _TelaEditarGabaritoState extends State<TelaEditarGabarito> {
                     child: ElevatedButton.icon(
                       onPressed: _salvarGabarito,
                       icon: const Icon(Icons.save),
-                      label: const Text(
-                        'SALVAR GABARITO COMPLETO',
-                        style: TextStyle(
+                      label: Text(
+                        'SALVAR GABARITO ($_numeroQuestoes questões)',
+                        style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
                         ),
