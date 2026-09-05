@@ -64,6 +64,9 @@ class _TelaAlunosState extends State<TelaAlunos> {
             }
           } else if (raw.startsWith('OMRCARD:')) {
             aluno ??= int.tryParse(raw.substring('OMRCARD:'.length));
+          } else if (raw.startsWith('OMRAV')) {
+            // Formato antigo do backend (retrocompatibilidade)
+            prova ??= int.tryParse(raw.substring('OMRAV'.length));
           }
         }
       }
