@@ -23,12 +23,19 @@ class TelaConfirmacao extends StatefulWidget {
 
 class _TelaConfirmacaoState extends State<TelaConfirmacao> {
   late List<String> _respostasRevisadas;
+  late String _urlDebug;
 
   @override
   void initState() {
     super.initState();
     // Começa com as respostas detectadas pela câmera
     _respostasRevisadas = List.from(widget.respostasDetectadas);
+
+    // 🟢 URL da imagem de debug do servidor (com timestamp pra não cachear imagem antiga)
+    final appState = Provider.of<AppState>(context, listen: false);
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    _urlDebug =
+        "${appState.ipServidor}/debug/debug_leitura_final.jpg?t=$timestamp";
   }
 
   @override
@@ -72,9 +79,9 @@ class _TelaConfirmacaoState extends State<TelaConfirmacao> {
       ),
       body: Column(
         children: [
-          // 1. Miniatura da Foto
+          // 1. 🟢 IMAGEM DE DEBUG DO SERVIDOR (com os círculos verdes da leitura)
           Container(
-            height: 150,
+            height: 200,
             width: double.infinity,
             decoration: BoxDecoration(
               color: Colors.black,
@@ -86,7 +93,46 @@ class _TelaConfirmacaoState extends State<TelaConfirmacao> {
                 ),
               ],
             ),
-            child: Image.file(widget.fotoRecortada, fit: BoxFit.contain),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                Image.network(
+                  _urlDebug,
+                  fit: BoxFit.contain,
+                  loadingBuilder: (context, child, progress) {
+                    if (progress == null) return child;
+                    return const Center(
+                      child: CircularProgressIndicator(color: Colors.white),
+                    );
+                  },
+                  errorBuilder: (context, error, stack) {
+                    // Fallback: se o servidor falhar, mostra a foto do celular
+                    return Image.file(
+                      widget.fotoRecortada,
+                      fit: BoxFit.contain,
+                    );
+                  },
+                ),
+                Positioned(
+                  top: 6,
+                  right: 8,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Text(
+                      "🟢 Conferência da leitura",
+                      style: TextStyle(color: Colors.white, fontSize: 10),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
 
           // 2. Informações do Aluno e Nota

@@ -21,6 +21,7 @@ import 'tela_analise_pedagogica.dart';
 import 'tela_cadastro_avaliacao_aberta.dart';
 import 'tela_correcao_aberta.dart';
 import 'tela_teste_ias.dart';
+import 'tela_diario.dart';
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -43,7 +44,7 @@ class _TelaAlunosState extends State<TelaAlunos> {
     });
   }
 
-  // 🔲 Lê TODOS os QRs das folhas e junta: prova (OMRPROVA/OMRALUNO) + aluno (OMRALUNO/OMRCARD)
+  // 🔲 Lê TODOS os QRs das folhas e junta: prova (OMRPROVA/OMRALUNO/OMRAV) + aluno (OMRALUNO/OMRCARD)
   Future<Map<String, int?>> _lerQRDasFolhas(List<String> caminhos) async {
     int? prova;
     int? aluno;
@@ -990,6 +991,11 @@ class _TelaAlunosState extends State<TelaAlunos> {
                   context,
                   MaterialPageRoute(builder: (context) => const TelaTesteIAs()),
                 );
+              } else if (value == 'diario') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const TelaDiario()),
+                );
               } else if (value == 'sync') {
                 _recarregarLista();
               }
@@ -1018,6 +1024,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
               const PopupMenuItem(
                 value: 'lab',
                 child: Text('🧪 Laboratório de IAs'),
+              ),
+              const PopupMenuItem(
+                value: 'diario',
+                child: Text('📔 Diário de Vistos'),
               ),
               const PopupMenuItem(value: 'sync', child: Text('🔄 Recarregar')),
             ],
