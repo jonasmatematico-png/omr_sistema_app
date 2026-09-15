@@ -22,6 +22,7 @@ import 'tela_cadastro_avaliacao_aberta.dart';
 import 'tela_correcao_aberta.dart';
 import 'tela_teste_ias.dart';
 import 'tela_diario.dart';
+import 'tela_correcao_lote.dart';
 
 class TelaAlunos extends StatefulWidget {
   const TelaAlunos({super.key});
@@ -986,6 +987,13 @@ class _TelaAlunosState extends State<TelaAlunos> {
                     builder: (context) => const TelaCorrecaoAberta(),
                   ),
                 );
+              } else if (value == 'lote') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const TelaCorrecaoLote(),
+                  ),
+                );
               } else if (value == 'lab') {
                 Navigator.push(
                   context,
@@ -1012,6 +1020,10 @@ class _TelaAlunosState extends State<TelaAlunos> {
               const PopupMenuItem(
                 value: 'corrigiraberta',
                 child: Text('🤖 Corrigir Prova Aberta'),
+              ),
+              const PopupMenuItem(
+                value: 'lote',
+                child: Text('📦 Corrigir em Lote'),
               ),
               const PopupMenuItem(
                 value: 'saeb',
@@ -1113,6 +1125,37 @@ class _TelaAlunosState extends State<TelaAlunos> {
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.deepPurple,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const TelaCorrecaoLote(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.photo_library, size: 22),
+                            label: const Text(
+                              "📦 CORREÇÃO EM LOTE",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.purple.shade700,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               shape: RoundedRectangleBorder(
