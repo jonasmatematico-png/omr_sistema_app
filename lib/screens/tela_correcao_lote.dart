@@ -8,6 +8,7 @@ import 'package:google_mlkit_document_scanner/google_mlkit_document_scanner.dart
 import 'package:google_mlkit_barcode_scanning/google_mlkit_barcode_scanning.dart';
 import '../context/app_state.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class TelaCorrecaoLote extends StatefulWidget {
   const TelaCorrecaoLote({super.key});
@@ -621,6 +622,7 @@ class _TelaCorrecaoLoteState extends State<TelaCorrecaoLote> {
             .delete()
             .eq('id_aluno', f['id_aluno'])
             .eq('id_avaliacao', avalId!);
+
         await supabase.from('resultados').insert({
           'id_aluno': f['id_aluno'],
           'id_avaliacao': avalId,
@@ -629,6 +631,53 @@ class _TelaCorrecaoLoteState extends State<TelaCorrecaoLote> {
           'nivel_saeb': nivel,
           'devolutiva': 'Correção em lote (IA, revisada). $resumo',
         });
+
+        // 💾 NOVO: Salvar detalhes da correção (transcrições, justificativas)
+        try {
+          final appState = Provider.of<AppState>(context, listen: false);
+          final sugs = (f['sugestoes'] as List<Map<String, dynamic>>?) ?? [];
+          final questoesDetalhadas = <Map<String, dynamic>>[];
+          for (final s in sugs) {
+            final numQ = (s['numero'] as num?)?.toInt() ?? 0;
+            final controller = _notaControllers[i]?[numQ];
+            final notaFinal =
+                double.tryParse(
+                  (controller?.text ?? '').replaceAll(',', '.'),
+                ) ??
+                0;
+            final q = _questoes.firstWhere(
+              (q) => (q['numero'] as num?)?.toInt() == numQ,
+              orElse: () => <String, dynamic>{},
+            );
+            questoesDetalhadas.add({
+              'numero': numQ,
+              'enunciado': '${q['enunciado'] ?? ''}',
+              'transcricao': '${s['transcricao'] ?? ''}',
+              'nota_sugerida_ia': (s['nota_sugerida'] as num?)?.toDouble() ?? 0,
+              'nota_final': notaFinal,
+              'valor_questao': (q['valor'] as num?)?.toDouble() ?? 0,
+              'justificativa': '${s['justificativa'] ?? ''}',
+              'revisar': s['revisar'] == true,
+            });
+          }
+          await http
+              .post(
+                Uri.parse(
+                  '${appState.ipServidor}/api/salvar_correcao_detalhada',
+                ),
+                headers: {'Content-Type': 'application/json'},
+                body: jsonEncode({
+                  'id_aluno': f['id_aluno'],
+                  'id_avaliacao': avalId,
+                  'modelo_usado': '${f['modelo'] ?? ''}',
+                  'questoes': questoesDetalhadas,
+                }),
+              )
+              .timeout(const Duration(seconds: 30));
+        } catch (e) {
+          print('⚠️ Erro ao salvar detalhes: $e');
+        }
+
         f['status'] = 'salvo';
         salvas++;
       }
@@ -689,6 +738,55 @@ class _TelaCorrecaoLoteState extends State<TelaCorrecaoLote> {
           ? _buildEtapa3()
           : _buildEtapa4(),
     );
+  }
+
+  // 📄 Abrir PDF do aluno no navegador
+  void _abrirPdfAluno(int? idAluno) {
+    if (idAluno == null || avalId == null) return;
+    final appState = Provider.of<AppState>(context, listen: false);
+    final url = '${appState.ipServidor}/api/relatorio/aluno/$idAluno/$avalId';
+    _abrirUrl(url);
+  }
+
+  // 📄 Abrir PDF da turma no navegador
+  void _abrirPdfTurma() {
+    if (turmaId == null || avalId == null) return;
+    final appState = Provider.of<AppState>(context, listen: false);
+    final url = '${appState.ipServidor}/api/relatorio/turma/$turmaId/$avalId';
+    _abrirUrl(url);
+  }
+
+  // 🌐 Abre URL no navegador do celular (onde o PDF aparece de verdade!)
+  Future<void> _abrirUrl(String url) async {
+    try {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('📄 Abrindo PDF no navegador...'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠️ Não foi possível abrir o navegador.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('❌ $e')));
+      }
+    }
   }
 
   Widget _buildEtapa1() {
@@ -1073,25 +1171,45 @@ class _TelaCorrecaoLoteState extends State<TelaCorrecaoLote> {
             itemCount: _fila.length,
             itemBuilder: (_, i) {
               final f = _fila[i];
-              if (f['status'] != 'sucesso') return const SizedBox.shrink();
+              if (f['status'] != 'sucesso' && f['status'] != 'salvo') {
+                return const SizedBox.shrink();
+              }
               return _buildCardRevisao(i, f);
             },
           ),
         ),
         Padding(
           padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton.icon(
-              onPressed: revisadas > 0 ? _salvarNotas : null,
-              icon: const Icon(Icons.save),
-              label: Text('SALVAR $revisadas NOTA(S) NO BANCO'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.deepOrange,
-                foregroundColor: Colors.white,
+          child: Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: revisadas > 0 ? _salvarNotas : null,
+                  icon: const Icon(Icons.save),
+                  label: Text('SALVAR $revisadas NOTA(S) NO BANCO'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepOrange,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
               ),
-            ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: (turmaId != null && avalId != null)
+                      ? _abrirPdfTurma
+                      : null,
+                  icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                  label: const Text('📄 RELATÓRIO DA TURMA (PDF)'),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -1119,6 +1237,13 @@ class _TelaCorrecaoLoteState extends State<TelaCorrecaoLote> {
             color: nota10 >= 6 ? Colors.green : Colors.red,
           ),
         ),
+        trailing: f['status'] == 'salvo'
+            ? IconButton(
+                icon: const Icon(Icons.picture_as_pdf, color: Colors.red),
+                tooltip: 'Gerar Relatório PDF',
+                onPressed: () => _abrirPdfAluno(f['id_aluno']),
+              )
+            : null,
         children: [
           for (final q in _questoes) ...[
             _buildQuestaoRevisao(idxFila, q, sugs),
