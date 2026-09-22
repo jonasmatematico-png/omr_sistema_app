@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'tela_assistente_ia.dart';
 
 class TelaCadastroAvaliacao extends StatefulWidget {
   const TelaCadastroAvaliacao({super.key});
@@ -13,6 +14,7 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
   final _pesoController = TextEditingController(text: '1');
   final _questoesController = TextEditingController(text: '10');
 
+  int? _idAvaliacaoSalva;
   int _bimestre = 3;
   String _modo = 'omr';
   String _tipo = 'Prova';
@@ -21,6 +23,7 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
 
   final List<String> _tipos = [
     'Prova',
+    'Prova Aberta',
     'Simulado SAEB',
     'Trabalho',
     'Atividade',
@@ -40,25 +43,33 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
     setState(() => _salvando = true);
     try {
       final supabase = Supabase.instance.client;
-      // 🚨 CORREÇÃO: removida a coluna 'disciplina' (não existe na tabela)
-      await supabase.from('avaliacoes').insert({
-        'nome': _nomeController.text.trim(),
-        'data_prova': _data.toIso8601String().split('T')[0],
-        'numero_questoes': int.tryParse(_questoesController.text) ?? 10,
-        'bimestre': _bimestre,
-        'peso_media':
-            double.tryParse(_pesoController.text.replaceAll(',', '.')) ?? 1.0,
-        'modo_correcao': _modo,
-        'tipo': _tipo,
+      final resp = await supabase
+          .from('avaliacoes')
+          .insert({
+            'nome': _nomeController.text.trim(),
+            'data_prova': _data.toIso8601String().split('T')[0],
+            'numero_questoes': int.tryParse(_questoesController.text) ?? 10,
+            'bimestre': _bimestre,
+            'peso_media':
+                double.tryParse(_pesoController.text.replaceAll(',', '.')) ??
+                1.0,
+            'modo_correcao': _modo,
+            'tipo': _tipo,
+          })
+          .select('id')
+          .single();
+
+      setState(() {
+        _idAvaliacaoSalva = resp['id'] as int;
       });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('✅ Avaliação cadastrada com sucesso!'),
+            content: Text('✅ Salvo! Agora o botão roxo está liberado.'),
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -70,8 +81,29 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
         );
       }
     } finally {
-      setState(() => _salvando = false);
+      if (mounted) setState(() => _salvando = false);
     }
+  }
+
+  void _irParaAssistenteIA() {
+    if (_idAvaliacaoSalva == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('⚠️ Preencha o nome e clique em SALVAR primeiro!'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TelaAssistenteIA(
+          avaliacaoId: _idAvaliacaoSalva,
+          nomeAvaliacao: _nomeController.text,
+        ),
+      ),
+    );
   }
 
   @override
@@ -106,35 +138,37 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
                   children: [
                     Expanded(
                       child: DropdownButtonFormField<String>(
-                        isExpanded: true, // 🚨 CORREÇÃO do overflow
+                        isExpanded: true,
                         value: _tipo,
                         decoration: const InputDecoration(
                           labelText: 'Tipo',
                           border: OutlineInputBorder(),
                         ),
-                        items: [
-                          for (final t in _tipos)
-                            DropdownMenuItem(
-                              value: t,
-                              child: Text(t, overflow: TextOverflow.ellipsis),
-                            ),
-                        ],
+                        items: _tipos
+                            .map(
+                              (t) => DropdownMenuItem(value: t, child: Text(t)),
+                            )
+                            .toList(),
                         onChanged: (v) => setState(() => _tipo = v ?? 'Prova'),
                       ),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: DropdownButtonFormField<int>(
-                        isExpanded: true, // 🚨 CORREÇÃO do overflow
+                        isExpanded: true,
                         value: _bimestre,
                         decoration: const InputDecoration(
                           labelText: 'Bimestre',
                           border: OutlineInputBorder(),
                         ),
-                        items: [
-                          for (int i = 1; i <= 4; i++)
-                            DropdownMenuItem(value: i, child: Text('$iº')),
-                        ],
+                        items: [1, 2, 3, 4]
+                            .map(
+                              (i) => DropdownMenuItem(
+                                value: i,
+                                child: Text('$iº'),
+                              ),
+                            )
+                            .toList(),
                         onChanged: (v) => setState(() => _bimestre = v ?? 3),
                       ),
                     ),
@@ -144,11 +178,8 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.calendar_month, color: Colors.teal),
-                  title: const Text('Data da avaliação'),
-                  subtitle: Text(
-                    '${_data.day.toString().padLeft(2, '0')}/${_data.month.toString().padLeft(2, '0')}/${_data.year}',
-                  ),
-                  trailing: const Icon(Icons.edit_calendar),
+                  title: const Text('Data'),
+                  subtitle: Text('${_data.day}/${_data.month}/${_data.year}'),
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: context,
@@ -175,7 +206,7 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
                       onSelected: (_) => setState(() => _modo = 'omr'),
                     ),
                     ChoiceChip(
-                      label: const Text('✍️ Nota manual'),
+                      label: const Text('✍️ Nota manual / Aberta'),
                       selected: _modo == 'manual',
                       onSelected: (_) => setState(() => _modo = 'manual'),
                     ),
@@ -199,12 +230,13 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
                     decimal: true,
                   ),
                   decoration: const InputDecoration(
-                    labelText: 'Peso na média do bimestre',
+                    labelText: 'Peso na média',
                     border: OutlineInputBorder(),
-                    helperText: 'Ex: Prova vale 2, trabalho vale 1.',
                   ),
                 ),
                 const SizedBox(height: 24),
+
+                // BOTÃO DE SALVAR
                 ElevatedButton.icon(
                   onPressed: _salvando ? null : _salvar,
                   icon: _salvando
@@ -218,7 +250,7 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
                         )
                       : const Icon(Icons.save),
                   label: const Text(
-                    'SALVAR AVALIAÇÃO',
+                    '💾 SALVAR E CONTINUAR',
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
@@ -227,11 +259,48 @@ class _TelaCadastroAvaliacaoState extends State<TelaCadastroAvaliacao> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                 ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
+
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 16),
+
+                // 🚨 BOTÃO ROXO SEMPRE VISÍVEL PARA TESTE 🚨
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _irParaAssistenteIA,
+                    icon: const Icon(Icons.smart_toy, color: Colors.white),
+                    label: const Text(
+                      '🤖 ASSISTENTE DE IA: GERAR QUESTÕES',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.deepPurple,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.pop(context, true),
+                    icon: const Icon(Icons.check_circle, color: Colors.green),
+                    label: const Text(
+                      'FINALIZAR E VOLTAR',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+              ], // Fecha children do Column
+            ), // Fecha Column
+          ), // Fecha Padding
+        ), // Fecha Card
+      ), // Fecha SingleChildScrollView
+    ); // Fecha return Scaffold
+  } // Fecha método build
+} // Fecha classe _TelaCadastroAvaliacaoState
