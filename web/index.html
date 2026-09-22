@@ -11,12 +11,14 @@
     .header { background: #008080; color: white; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
     .header h1 { font-size: 20px; font-weight: 600; }
     .header .user-info { display: flex; gap: 12px; align-items: center; font-size: 13px; }
-    .btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; }
+    .btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 500; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
     .btn-primary { background: #008080; color: white; }
     .btn-secondary { background: #ff6b35; color: white; }
     .btn-ghost { background: transparent; color: white; border: 1px solid white; }
     .btn-danger { background: #dc3545; color: white; }
     .btn-warn { background: #ffc107; color: #333; }
+    .btn-ia { background: #6f42c1; color: white; } /* Cor roxa para a IA */
     .btn-sm { padding: 6px 12px; font-size: 12px; }
     .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .form-group { margin-bottom: 16px; }
@@ -30,8 +32,8 @@
     .remove-btn { background: transparent; color: #dc3545; border: none; cursor: pointer; font-size: 18px; padding: 4px 8px; }
     .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
     .modal.active { display: flex; }
-    .modal-content { background: white; border-radius: 8px; padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .modal-content { background: white; border-radius: 8px; padding: 24px; max-width: 700px; width: 90%; max-height: 85vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #eee; padding-bottom: 12px; }
     .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 6px; color: white; font-size: 14px; z-index: 2000; max-width: 400px; }
     .toast.success { background: #28a745; }
     .toast.error { background: #dc3545; }
@@ -54,7 +56,15 @@
     .cartao-nome { font-size: 11px; font-weight: 700; margin-top: 4px; }
     .cartao-turma { font-size: 10px; color: #666; }
     #cartoesGrid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
-
+    
+    /* Estilos específicos do Modal IA */
+    .ia-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+    .ia-tab { flex: 1; padding: 10px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 6px; cursor: pointer; font-weight: 500; text-align: center; }
+    .ia-tab.active { background: #6f42c1; color: white; border-color: #6f42c1; }
+    .ia-preview-card { background: #f3f0ff; border: 1px solid #d6bfff; border-radius: 6px; padding: 12px; margin-bottom: 8px; }
+    .ia-preview-card strong { color: #6f42c1; }
+    .habilidade-item { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #eee; }
+    .habilidade-item input { width: auto; }
 
     @page { size: A4; margin: 1cm; }
     @media print {
@@ -123,7 +133,12 @@
           <select id="bimestre"><option value="1">1º</option><option value="2">2º</option><option value="3" selected>3º</option><option value="4">4º</option></select>
         </div>
         <div class="form-group"><label>Peso na média</label><input type="number" id="peso" value="1" step="0.1"></div>
-        <div class="form-group"><label>&nbsp;</label><button class="btn btn-secondary" style="width: 100%;" onclick="abrirModalColar()">📋 Colar do Word</button></div>
+        <div class="form-group"><label>&nbsp;</label>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-secondary" style="flex: 1;" onclick="abrirModalColar()">📋 Colar do Word</button>
+            <button class="btn btn-ia" style="flex: 1;" onclick="abrirModalIA()">🤖 Assistente IA</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -153,24 +168,93 @@
   </div>
 </div>
 
+<!-- Modal Colar -->
 <div id="modalColar" class="modal">
   <div class="modal-content">
-    <div class="modal-header"><h3>📋 Colar prova do Word/Docs</h3><button class="btn btn-sm" onclick="fecharModal()">✕</button></div>
+    <div class="modal-header"><h3>📋 Colar prova do Word/Docs</h3><button class="btn btn-sm" onclick="fecharModal('modalColar')">✕</button></div>
     <p style="font-size: 13px; margin-bottom: 8px;">Cole no formato:</p>
     <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; margin-bottom: 12px;">
       1) Enunciado da questão | critério de correção | valor<br>2) Outra questão | critério | valor
     </div>
     <textarea id="textareaColar" style="width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui..."></textarea>
     <div style="display: flex; gap: 8px; margin-top: 16px;">
-      <button class="btn btn-secondary" style="flex: 1;" onclick="fecharModal()">Cancelar</button>
+      <button class="btn btn-secondary" style="flex: 1;" onclick="fecharModal('modalColar')">Cancelar</button>
       <button class="btn btn-primary" style="flex: 1;" onclick="colarDoWord()">Usar essas</button>
     </div>
   </div>
 </div>
 
+<!-- Modal Assistente IA -->
+<div id="modalIA" class="modal">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h3>🤖 Assistente Pedagógico IA</h3>
+      <button class="btn btn-sm" onclick="fecharModal('modalIA')">✕</button>
+    </div>
+    
+    <div class="ia-tabs">
+      <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
+      <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar">🔍 Identificar Habilidade</div>
+    </div>
+
+    <!-- ABA GERAR -->
+    <div id="abaGerar">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Fonte</label>
+          <select id="iaFonte"><option value="CP">Currículo Paulista</option><option value="SAEB">SAEB</option></select>
+        </div>
+        <div class="form-group">
+          <label>Ano</label>
+          <select id="iaAno"><option value="5">5º ano</option><option value="6" selected>6º ano</option><option value="9">9º ano</option></select>
+        </div>
+        <div class="form-group">
+          <label>Quantidade</label>
+          <select id="iaQtd"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Dificuldade</label>
+          <select id="iaDificuldade"><option value="fácil">Fácil</option><option value="média" selected>Média</option><option value="difícil">Difícil</option></select>
+        </div>
+        <div class="form-group" style="grid-column: span 2;">
+          <label>Contexto (opcional)</label>
+          <input type="text" id="iaContexto" placeholder="Ex: feira livre, mesada, horta da escola...">
+        </div>
+      </div>
+      
+      <button class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 12px;" onclick="carregarMatrizIA()">🔄 Carregar Habilidades Disponíveis</button>
+      
+      <div class="form-group">
+        <label>Selecione as habilidades/descritores:</label>
+        <div id="iaListaHabilidades" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px; background: #fafafa;">
+          <p style="font-size: 12px; color: #666; text-align: center;">Clique em "Carregar Habilidades" primeiro.</p>
+        </div>
+      </div>
+
+      <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarQuestoesIA()" id="btnGerarIA">✨ GERAR QUESTÕES COM IA</button>
+      
+      <div id="iaResultadoGerar" style="margin-top: 16px;"></div>
+    </div>
+
+    <!-- ABA IDENTIFICAR -->
+    <div id="abaIdentificar" class="hidden">
+      <div class="form-group">
+        <label>Cole o enunciado da questão pronta:</label>
+        <textarea id="iaTextoIdentificar" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui o texto da questão..."></textarea>
+      </div>
+      <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="identificarHabilidadeIA()" id="btnIdentificarIA">🔍 IDENTIFICAR HABILIDADE</button>
+      <div id="iaResultadoIdentificar" style="margin-top: 16px;"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal QR -->
 <div id="modalQR" class="modal">
   <div class="modal-content" style="text-align: center;">
-    <div class="modal-header"><h3>🔲 QR Code</h3><button class="btn btn-sm" onclick="fecharModalQR()">✕</button></div>
+    <div class="modal-header"><h3>🔲 QR Code</h3><button class="btn btn-sm" onclick="fecharModal('modalQR')">✕</button></div>
     <p style="font-size: 13px; margin-bottom: 12px;" id="qrNome"></p>
     <img id="qrImg" style="width: 240px; height: 240px; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" alt="QR Code">
     <p style="font-size: 12px; color: #888; margin: 12px 0;">Clique com o botão direito na imagem → <b>Salvar imagem</b>, e cole no canto da prova no Word.</p>
@@ -178,9 +262,10 @@
   </div>
 </div>
 
+<!-- Modal Cartões -->
 <div id="modalCartoes" class="modal">
   <div class="modal-content" style="max-width: 800px;">
-    <div class="modal-header"><h3>🪪 Folha de QRs</h3><button class="btn btn-sm" onclick="document.getElementById('modalCartoes').classList.remove('active')">✕</button></div>
+    <div class="modal-header"><h3>🪪 Folha de QRs</h3><button class="btn btn-sm" onclick="fecharModal('modalCartoes')">✕</button></div>
     <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Aguarde as imagens carregarem e clique em Imprimir. Recorte e cole na prova (ou lamina para reutilizar).</p>
     <div id="areaImpressao"><div id="cartoesGrid"></div></div>
     <button class="btn btn-primary" style="width: 100%; margin-top: 16px;" onclick="window.print()">🖨️ Imprimir</button>
@@ -188,14 +273,17 @@
 </div>
 
 <script>
-  var SUPABASE_URL = 'https://mkqnaiuplkqiitwxltli.supabase.co';
-  var ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rcW5haXVwbGtxaWl0d3hsdGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTg5MzMsImV4cCI6MjA5OTk3NDkzM30.65MoDC1gMNpNs6bCKZlCTyCn2ijaaA6y9DOnQgNxacA';
+  // CONFIGURAÇÕES
+  const SUPABASE_URL = 'https://mkqnaiuplkqiitwxltli.supabase.co';
+  const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rcW5haXVwbGtxaWl0d3hsdGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTg5MzMsImV4cCI6MjA5OTk3NDkzM30.65MoDC1gMNpNs6bCKZlCTyCn2ijaaA6y9DOnQgNxacA';
+  const API_URL = 'http://192.168.3.20:5000'; // URL do seu servidor Python
 
   var token = localStorage.getItem('sb_token');
   var refreshToken = localStorage.getItem('sb_refresh');
   var userEmail = localStorage.getItem('sb_email') || '';
   var questoes = [];
   var editandoId = null;
+  var matrizHabilidades = [];
 
   function headersCom(prefer) {
     var h = { 'apikey': ANON, 'Content-Type': 'application/json' };
@@ -312,7 +400,7 @@
   }
 
   function abrirModalColar() { document.getElementById('modalColar').classList.add('active'); document.getElementById('textareaColar').value = ''; }
-  function fecharModal() { document.getElementById('modalColar').classList.remove('active'); }
+  function fecharModal(id) { document.getElementById(id).classList.remove('active'); }
   function colarDoWord() {
     var texto = document.getElementById('textareaColar').value;
     if (!texto.trim()) { toast('Cole o texto primeiro', 'error'); return; }
@@ -328,10 +416,174 @@
       } else if (novas.length > 0) { novas[novas.length - 1].enunciado += '\n' + linha; }
     });
     if (novas.length === 0) { toast('Use o formato "1) enunciado | critério | valor"', 'error'); return; }
-    questoes = novas; renderizarQuestoes(); fecharModal();
+    questoes = novas; renderizarQuestoes(); fecharModal('modalColar');
     toast(novas.length + ' questão(ões) importada(s)!', 'success');
   }
 
+  // ========================================================================
+  // 🤖 FUNÇÕES DO ASSISTENTE DE IA
+  // ========================================================================
+  function abrirModalIA() { 
+    document.getElementById('modalIA').classList.add('active'); 
+    mudarAbaIA('gerar');
+    document.getElementById('iaResultadoGerar').innerHTML = '';
+    document.getElementById('iaResultadoIdentificar').innerHTML = '';
+  }
+  
+  function mudarAbaIA(aba) {
+    if (aba === 'gerar') {
+      document.getElementById('tabGerar').classList.add('active');
+      document.getElementById('tabIdentificar').classList.remove('active');
+      document.getElementById('abaGerar').classList.remove('hidden');
+      document.getElementById('abaIdentificar').classList.add('hidden');
+    } else {
+      document.getElementById('tabIdentificar').classList.add('active');
+      document.getElementById('tabGerar').classList.remove('active');
+      document.getElementById('abaIdentificar').classList.remove('hidden');
+      document.getElementById('abaGerar').classList.add('hidden');
+    }
+  }
+
+  async function carregarMatrizIA() {
+    var fonte = document.getElementById('iaFonte').value;
+    var ano = document.getElementById('iaAno').value;
+    var container = document.getElementById('iaListaHabilidades');
+    container.innerHTML = '<p style="text-align:center; color:#666;">Carregando...</p>';
+    
+    try {
+      var r = await fetch(API_URL + '/api/matriz?fonte=' + fonte + '&ano=' + ano);
+      var j = await r.json();
+      if (j.sucesso && j.itens) {
+        matrizHabilidades = j.itens;
+        container.innerHTML = matrizHabilidades.map(function(item) {
+          return '<label class="habilidade-item">' +
+            '<input type="checkbox" value="' + item.codigo + '"> ' +
+            '<strong>' + item.codigo + '</strong>: ' + item.descricao +
+            '</label>';
+        }).join('');
+      } else {
+        container.innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar matriz.</p>';
+      }
+    } catch (e) {
+      container.innerHTML = '<p style="color:red; text-align:center;">Falha na conexão com a API.</p>';
+    }
+  }
+
+  async function gerarQuestoesIA() {
+    var checkboxes = document.querySelectorAll('#iaListaHabilidades input[type="checkbox"]:checked');
+    var codigos = Array.from(checkboxes).map(function(cb) { return cb.value; });
+    
+    if (codigos.length === 0) { toast('Selecione pelo menos 1 habilidade!', 'error'); return; }
+    
+    var btn = document.getElementById('btnGerarIA');
+    btn.textContent = '⏳ Gerando...';
+    btn.disabled = true;
+    
+    try {
+      var payload = {
+        codigos: codigos,
+        fonte: document.getElementById('iaFonte').value,
+        componente: 'Matemática',
+        ano: parseInt(document.getElementById('iaAno').value),
+        quantidade: parseInt(document.getElementById('iaQtd').value),
+        dificuldade: document.getElementById('iaDificuldade').value,
+        contexto: document.getElementById('iaContexto').value,
+        valor_padrao: 2.0
+      };
+      
+      var r = await fetch(API_URL + '/api/gerar_questoes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var j = await r.json();
+      
+      if (j.sucesso && j.questoes) {
+        var html = '<h4 style="margin-bottom:8px;">Questões Geradas:</h4>';
+        j.questoes.forEach(function(q, idx) {
+          html += '<div class="ia-preview-card">' +
+            '<strong>' + q.codigo + '</strong> (Questão ' + (idx+1) + ')<br>' +
+            '<p style="font-size:13px; margin: 6px 0;"><strong>Enunciado:</strong> ' + q.enunciado + '</p>' +
+            '<p style="font-size:13px; margin: 6px 0;"><strong>Resposta:</strong> ' + q.resposta_esperada + '</p>' +
+            '<p style="font-size:13px; margin: 6px 0;"><strong>Valor:</strong> ' + q.valor + '</p>' +
+            '<button class="btn btn-primary btn-sm" onclick="adicionarQuestaoGerada(' + idx + ')">➕ Adicionar à Prova</button>' +
+            '</div>';
+        });
+        // Guarda as questões geradas em uma variável global temporária
+        window.questoesGeradasTemp = j.questoes;
+        document.getElementById('iaResultadoGerar').innerHTML = html;
+        toast('Questões geradas com sucesso!', 'success');
+      } else {
+        toast('Erro: ' + (j.erro || 'Falha ao gerar'), 'error');
+      }
+    } catch (e) {
+      toast('Falha na conexão com a API: ' + e.message, 'error');
+    } finally {
+      btn.textContent = '✨ GERAR QUESTÕES COM IA';
+      btn.disabled = false;
+    }
+  }
+
+  function adicionarQuestaoGerada(idx) {
+    if (!window.questoesGeradasTemp || !window.questoesGeradasTemp[idx]) return;
+    var q = window.questoesGeradasTemp[idx];
+    questoes.push({
+      enunciado: q.enunciado || '',
+      resposta: q.resposta_esperada || '',
+      valor: String(q.valor || 2),
+      imagemUrl: null,
+      file: null
+    });
+    renderizarQuestoes();
+    toast('Questão adicionada!', 'success');
+  }
+
+  async function identificarHabilidadeIA() {
+    var texto = document.getElementById('iaTextoIdentificar').value.trim();
+    if (texto.length < 10) { toast('Cole o texto completo da questão!', 'error'); return; }
+    
+    var btn = document.getElementById('btnIdentificarIA');
+    btn.textContent = '⏳ Identificando...';
+    btn.disabled = true;
+    
+    try {
+      var payload = {
+        texto: texto,
+        fonte: document.getElementById('iaFonte').value,
+        componente: 'Matemática',
+        ano: parseInt(document.getElementById('iaAno').value)
+      };
+      
+      var r = await fetch(API_URL + '/api/identificar_habilidade', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      var j = await r.json();
+      
+      if (j.sucesso && j.resultados) {
+        var html = '<h4 style="margin-bottom:8px;">Habilidades Identificadas:</h4>';
+        j.resultados.forEach(function(res) {
+          html += '<div class="ia-preview-card">' +
+            '<strong>' + res.codigo + '</strong> - Aderência: <strong>' + res.aderencia + '%</strong><br>' +
+            '<p style="font-size:13px; margin: 6px 0; font-style:italic;">' + res.justificativa + '</p>' +
+            '</div>';
+        });
+        document.getElementById('iaResultadoIdentificar').innerHTML = html;
+      } else {
+        toast('Erro: ' + (j.erro || 'Falha ao identificar'), 'error');
+      }
+    } catch (e) {
+      toast('Falha na conexão com a API: ' + e.message, 'error');
+    } finally {
+      btn.textContent = '🔍 IDENTIFICAR HABILIDADE';
+      btn.disabled = false;
+    }
+  }
+
+  // ========================================================================
+  // FUNÇÕES SUPABASE E OUTRAS
+  // ========================================================================
   async function sbFetch(method, path, body, prefer) {
     var opts = { method: method, headers: headersCom(prefer) };
     if (body !== undefined) opts.body = JSON.stringify(body);
@@ -384,7 +636,6 @@
     document.getElementById('qrLink').href = url;
     document.getElementById('modalQR').classList.add('active');
   }
-  function fecharModalQR() { document.getElementById('modalQR').classList.remove('active'); }
 
   async function carregarSelectsQR() {
     try {
@@ -452,7 +703,7 @@
       var r2 = await sbFetch('GET', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + id + '&select=enunciado,resposta_esperada,valor,imagem_url&order=numero.asc');
       var qs = await r2.json();
       document.getElementById('nomeProva').value = a.nome;
-      document.getElementById('bimestre').value = String(a.bimestre)
+      document.getElementById('bimestre').value = String(a.bimestre);
       document.getElementById('peso').value = String(a.peso_media);
       document.getElementById('disciplina').value = a.disciplina || 'Matemática';
       questoes = qs.map(function (q) {
