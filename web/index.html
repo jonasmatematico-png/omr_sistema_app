@@ -18,7 +18,7 @@
     .btn-ghost { background: transparent; color: white; border: 1px solid white; }
     .btn-danger { background: #dc3545; color: white; }
     .btn-warn { background: #ffc107; color: #333; }
-    .btn-ia { background: #6f42c1; color: white; } /* Cor roxa para a IA */
+    .btn-ia { background: #6f42c1; color: white; }
     .btn-sm { padding: 6px 12px; font-size: 12px; }
     .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
     .form-group { margin-bottom: 16px; }
@@ -57,7 +57,6 @@
     .cartao-turma { font-size: 10px; color: #666; }
     #cartoesGrid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
     
-    /* Estilos específicos do Modal IA */
     .ia-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
     .ia-tab { flex: 1; padding: 10px; border: 1px solid #ddd; background: #f8f9fa; border-radius: 6px; cursor: pointer; font-weight: 500; text-align: center; }
     .ia-tab.active { background: #6f42c1; color: white; border-color: #6f42c1; }
@@ -165,8 +164,38 @@
       <div class="section-title">Provas cadastradas</div>
       <div id="provasLista"><div class="loading">Carregando...</div></div>
     </div>
-  </div>
-</div>
+
+    <!-- NOVO CARD: DIAGNÓSTICO DA TURMA (COMPLETO E CORRIGIDO!) -->
+    <div class="card" style="margin-top: 24px; border-left: 5px solid #FF6F00; background: #FFF8E1;">
+      <div class="section-title" style="color: #FF6F00; border-bottom: 1px solid #FFE0B2;">📊 Diagnóstico da Turma</div>
+      <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
+        Descubra quais habilidades a turma mais errou e foque sua recuperação onde realmente importa!
+      </p>
+      
+      <div class="form-row" style="grid-template-columns: 1fr 1fr; margin-top: 12px;">
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Selecione a Prova:</label>
+          <select id="selProvaDiagnostico" onchange="carregarDiagnostico()">
+            <option value="">Carregando provas...</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label>Analisar por:</label>
+          <select id="tipoAnalise" onchange="carregarDiagnostico()">
+            <option value="descritor">Descritor (SAEB)</option>
+            <option value="habilidade">Habilidade (BNCC)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- ÁREA ONDE O GRÁFICO VAI APARECER -->
+      <div id="areaGraficoDiagnostico" style="margin-top: 16px;">
+        <p style="text-align: center; color: #999; font-style: italic;">Selecione uma prova para ver o diagnóstico.</p>
+      </div>
+    </div>
+
+  </div> <!-- Fim do container -->
+</div> <!-- Fim do mainScreen -->
 
 <!-- Modal Colar -->
 <div id="modalColar" class="modal">
@@ -276,7 +305,7 @@
   // CONFIGURAÇÕES
   const SUPABASE_URL = 'https://mkqnaiuplkqiitwxltli.supabase.co';
   const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rcW5haXVwbGtxaWl0d3hsdGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTg5MzMsImV4cCI6MjA5OTk3NDkzM30.65MoDC1gMNpNs6bCKZlCTyCn2ijaaA6y9DOnQgNxacA';
-  const API_URL = 'https://omr-sistema-api.onrender.com'; // URL do seu servidor Python
+  const API_URL = 'https://omr-sistema-api.onrender.com';
 
   var token = localStorage.getItem('sb_token');
   var refreshToken = localStorage.getItem('sb_refresh');
@@ -357,6 +386,7 @@
     novoForm();
     carregarProvas();
     carregarSelectsQR();
+    carregarProvasDiagnostico(); // <-- CHAMADA ADICIONADA AQUI
   }
 
   function novaQuestao() { return { enunciado: '', resposta: '', valor: '2', imagemUrl: null, file: null }; }
@@ -509,7 +539,6 @@
             '<button class="btn btn-primary btn-sm" onclick="adicionarQuestaoGerada(' + idx + ')">➕ Adicionar à Prova</button>' +
             '</div>';
         });
-        // Guarda as questões geradas em uma variável global temporária
         window.questoesGeradasTemp = j.questoes;
         document.getElementById('iaResultadoGerar').innerHTML = html;
         toast('Questões geradas com sucesso!', 'success');
@@ -806,6 +835,156 @@
       mostrarPrincipal(userEmail);
     }
   })();
+
+  // ========================================================================
+  // 📊 FUNÇÕES DO DIAGNÓSTICO DA TURMA
+  // ========================================================================
+  async function carregarProvasDiagnostico() {
+    var sel = document.getElementById('selProvaDiagnostico');
+    if (sel.options.length > 1) return;
+    
+    try {
+      var r = await sbFetch('GET', '/rest/v1/avaliacoes?select=id,nome,numero_questoes&order=id.desc');
+      var provas = await r.json();
+      sel.innerHTML = '<option value="">Selecione uma prova...</option>' + 
+        provas.map(function(p) {
+          return '<option value="' + p.id + '" data-nome="' + p.nome + '">' + p.nome + '</option>';
+        }).join('');
+    } catch(e) {
+      sel.innerHTML = '<option value="">Erro ao carregar</option>';
+    }
+  }
+
+  async function carregarDiagnostico() {
+    var sel = document.getElementById('selProvaDiagnostico');
+    var idProva = sel.value;
+    var area = document.getElementById('areaGraficoDiagnostico');
+    
+    if (!idProva) {
+      area.innerHTML = '<p style="text-align: center; color: #999; font-style: italic;">Selecione uma prova para ver o diagnóstico.</p>';
+      return;
+    }
+    
+    area.innerHTML = '<p style="text-align: center; color: #666;">⏳ Calculando diagnóstico...</p>';
+    
+    try {
+      // 1. Buscar questões (Tentamos a tabela 'questoes' para objetiva)
+      var rQuestoes = await sbFetch('GET', '/rest/v1/questoes?id_avaliacao=eq.' + idProva + '&select=id,numero,descritor,habilidade');
+      
+      // VERIFICAÇÃO DE SEGURANÇA: Se a requisição falhou, pegamos o erro real do Supabase
+      if (!rQuestoes.ok) {
+        var erroQ = await rQuestoes.json();
+        throw new Error("Erro no banco: " + (erroQ.message || erroQ.hint || rQuestoes.status));
+      }
+      
+      var questoes = await rQuestoes.json();
+      
+      // GARANTIR QUE É UMA LISTA (ARRAY)
+      if (!Array.isArray(questoes)) {
+        throw new Error("Formato de dados inválido.");
+      }
+
+      // 2. Buscar respostas dos alunos
+      var rRespostas = await sbFetch('GET', '/rest/v1/respostas?id_avaliacao=eq.' + idProva + '&select=id_questao,correta');
+      
+      if (!rRespostas.ok) {
+        var erroR = await rRespostas.json();
+        throw new Error("Erro ao buscar respostas: " + (erroR.message || erroR.hint || rRespostas.status));
+      }
+
+      var respostas = await rRespostas.json();
+      if (!Array.isArray(respostas)) {
+        respostas = []; // Se não houver respostas, tratamos como lista vazia
+      }
+      
+      // 3. Validações de dados
+      if (questoes.length === 0) {
+        area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Esta prova não possui questões registradas com descritor/habilidade.</p>';
+        return;
+      }
+      
+      if (respostas.length === 0) {
+        area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhum aluno corrigiu esta prova ainda no sistema.</p>';
+        return;
+      }
+      
+      // 4. Agrupar pela coluna escolhida (Descritor ou Habilidade)
+      var tipoEscolhido = document.getElementById('tipoAnalise').value; 
+      var tituloEixo = tipoEscolhido === 'habilidade' ? 'Habilidade (BNCC)' : 'Descritor (SAEB)';
+
+      var mapaAgrupado = {};
+      questoes.forEach(function(q) {
+        var chave = q[tipoEscolhido] || 'Não classificado';
+        if (!mapaAgrupado[chave]) mapaAgrupado[chave] = { total: 0, acertos: 0 };
+      });
+      
+      respostas.forEach(function(r) {
+        var questao = questoes.find(function(q) { return q.numero === r.id_questao; });
+        if (questao) {
+          var chave = questao[tipoEscolhido] || 'Não classificado';
+          mapaAgrupado[chave].total++;
+          if (r.correta) mapaAgrupado[chave].acertos++;
+        }
+      });
+      
+      // 5. Calcular percentuais e ordenar
+      var resultados = Object.keys(mapaAgrupado).map(function(chave) {
+        var dados = mapaAgrupado[chave];
+        var percentual = dados.total > 0 ? (dados.acertos / dados.total * 100) : 0;
+        return {
+          chave: chave,
+          total: dados.total,
+          acertos: dados.acertos,
+          percentual: percentual.toFixed(1)
+        };
+      }).sort(function(a, b) { return a.percentual - b.percentual; });
+      
+      // 6. Gerar HTML do gráfico de barras
+      var html = '<h4 style="margin-bottom: 12px; color: #333;">📊 Desempenho por ' + tituloEixo + ' (do pior para o melhor):</h4>';
+      
+      resultados.forEach(function(item) {
+        var cor = item.percentual < 50 ? '#dc3545' : (item.percentual < 70 ? '#ffc107' : '#28a745');
+        var emoji = item.percentual < 50 ? '🔴' : (item.percentual < 70 ? '🟡' : '🟢');
+        
+        html += '<div style="margin-bottom: 12px;">';
+        html += '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">';
+        html += '<strong>' + emoji + ' ' + item.chave + '</strong>';
+        html += '<span style="font-weight: bold; color: ' + cor + ';">' + item.percentual + '% de acerto</span>';
+        html += '</div>';
+        html += '<div style="background: #e0e0e0; border-radius: 6px; height: 24px; overflow: hidden;">';
+        html += '<div style="background: ' + cor + '; height: 100%; width: ' + item.percentual + '%; transition: width 0.5s;"></div>';
+        html += '</div>';
+        html += '<div style="font-size: 11px; color: #666; margin-top: 2px;">' + item.acertos + ' acertos de ' + item.total + ' respostas</div>';
+        html += '</div>';
+      });
+      
+      // 7. Adicionar botão de Plano de Recuperação
+      var itensRuins = resultados.filter(function(item) { return item.percentual < 50; });
+      if (itensRuins.length > 0) {
+        html += '<div style="margin-top: 20px; padding: 16px; background: #FFE0B2; border-radius: 8px; border-left: 4px solid #FF6F00;">';
+        html += '<h4 style="color: #E65100; margin-bottom: 8px;">🎯 Foco da Recuperação:</h4>';
+        html += '<p style="font-size: 13px; color: #333;">Os itens abaixo precisam de atenção urgente:</p>';
+        html += '<ul style="margin: 8px 0; padding-left: 20px;">';
+        itensRuins.forEach(function(item) {
+          html += '<li><strong>' + item.chave + '</strong> (' + item.percentual + '% de acerto)</li>';
+        });
+        html += '</ul>';
+        html += '<button class="btn btn-ia" style="width: 100%; margin-top: 8px;" onclick="gerarPlanoRecuperacao(' + idProva + ')">✨ Gerar Plano de Recuperação com IA</button>';
+        html += '</div>';
+      }
+      
+      area.innerHTML = html;
+      
+    } catch(e) {
+      console.error(e);
+      // Agora a tela vai mostrar EXATAMENTE qual é o erro do banco de dados!
+      area.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 20px; background: #ffe6e6; border-radius: 8px;">❌ <strong>Erro:</strong> ' + e.message + '<br><small>Verifique se a prova é do tipo "Objetiva" (tabela questoes) e se as colunas descritor/habilidade estão preenchidas.</small></p>';
+    }
+  }
+
+  function gerarPlanoRecuperacao(idProva) {
+    alert('🚧 Em breve: A IA vai gerar atividades de recuperação focadas nos descritores com menor desempenho!');
+  }
 </script>
 
 </body>
