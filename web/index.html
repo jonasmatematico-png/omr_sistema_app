@@ -73,6 +73,10 @@
       #modalCartoes .modal-content { max-width: 100%; width: 100%; max-height: none; overflow: visible; box-shadow: none; padding: 0; }
       #cartoesGrid { display: block; }
       .cartao { display: inline-block; vertical-align: top; margin: 6px; break-inside: avoid; page-break-inside: avoid; }
+      #modalRecuperacao { display: block !important; position: absolute; left: 0; top: 0; width: 100%; background: white; }
+      #modalRecuperacao .modal-content { max-width: 100%; width: 100%; max-height: none; overflow: visible; box-shadow: none; padding: 0; border-radius: 0; }
+      #modalRecuperacao .modal-header { display: none; }
+      #modalRecuperacao button { display: none !important; }
     }
   </style>
 </head>
@@ -116,15 +120,8 @@
       <div class="form-group"><label>Nome da prova</label><input type="text" id="nomeProva" placeholder="Ex: Prova Aberta - Frações"></div>
       <div class="form-group"><label>Matéria</label>
         <select id="disciplina">
-          <option selected>Matemática</option>
-          <option>Português</option>
-          <option>História</option>
-          <option>Geografia</option>
-          <option>Ciências</option>
-          <option>Inglês</option>
-          <option>Arte</option>
-          <option>Sociologia</option>
-          <option>Filosofia</option>
+          <option selected>Matemática</option><option>Português</option><option>História</option><option>Geografia</option>
+          <option>Ciências</option><option>Inglês</option><option>Arte</option><option>Sociologia</option><option>Filosofia</option>
         </select>
       </div>
       <div class="form-row">
@@ -156,8 +153,8 @@
         <div class="form-group"><label>Prova</label><select id="selProvaQR"></select></div>
       </div>
       <div id="alunosQRLista"></div>
-      <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="imprimirFolhaProva()">📄 Gerar folha de QRs desta prova (para colar nas provas)</button>
-      <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="imprimirCartoes()">🪪 Gerar cartões reutilizáveis da turma (imprimir/laminar)</button>
+      <button class="btn btn-primary" style="width: 100%; margin-top: 12px;" onclick="imprimirFolhaProva()">📄 Gerar folha de QRs desta prova</button>
+      <button class="btn btn-secondary" style="width: 100%; margin-top: 8px;" onclick="imprimirCartoes()">🪪 Gerar cartões reutilizáveis da turma</button>
     </div>
 
     <div class="card" style="margin-top: 24px;">
@@ -165,46 +162,49 @@
       <div id="provasLista"><div class="loading">Carregando...</div></div>
     </div>
 
-    <!-- NOVO CARD: DIAGNÓSTICO DA TURMA (COMPLETO E CORRIGIDO!) -->
-    <div class="card" style="margin-top: 24px; border-left: 5px solid #FF6F00; background: #FFF8E1;">
-      <div class="section-title" style="color: #FF6F00; border-bottom: 1px solid #FFE0B2;">📊 Diagnóstico da Turma</div>
-      <p style="font-size: 13px; color: #666; margin-bottom: 12px;">
-        Descubra quais habilidades a turma mais errou e foque sua recuperação onde realmente importa!
-      </p>
-      
-      <div class="form-row" style="grid-template-columns: 1fr 1fr; margin-top: 12px;">
-        <div class="form-group" style="margin-bottom: 0;">
-          <label>Selecione a Prova:</label>
-          <select id="selProvaDiagnostico" onchange="carregarDiagnostico()">
-            <option value="">Carregando provas...</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom: 0;">
-          <label>Analisar por:</label>
-          <select id="tipoAnalise" onchange="carregarDiagnostico()">
-            <option value="descritor">Descritor (SAEB)</option>
-            <option value="habilidade">Habilidade (BNCC)</option>
-          </select>
-        </div>
+    <!-- CARD: EXPORTAR PARA PLANILHA -->
+    <div class="card" style="margin-top: 24px; border-left: 5px solid #28a745; background: #f0fff4;">
+      <div class="section-title" style="color: #28a745; border-bottom: 1px solid #c3e6cb;">📊 Exportar Respostas para Planilha</div>
+      <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Gera uma tabela com as respostas de cada aluno, pronta para copiar e colar no Google Sheets.</p>
+      <div class="form-row" style="grid-template-columns: 1fr 1fr 1fr;">
+        <div class="form-group"><label>Turma:</label><select id="selTurmaPlanilha"></select></div>
+        <div class="form-group"><label>Prova:</label><select id="selProvaPlanilha"></select></div>
+        <div class="form-group"><label>&nbsp;</label><button class="btn btn-primary" style="width: 100%;" onclick="gerarTabelaPlanilha()">Gerar Tabela</button></div>
       </div>
+      <div id="areaTabelaPlanilha" style="margin-top: 16px;"><p style="text-align: center; color: #999; font-style: italic;">Selecione turma e prova para gerar a tabela.</p></div>
+    </div>
 
-      <!-- ÁREA ONDE O GRÁFICO VAI APARECER -->
-      <div id="areaGraficoDiagnostico" style="margin-top: 16px;">
-        <p style="text-align: center; color: #999; font-style: italic;">Selecione uma prova para ver o diagnóstico.</p>
+    <!-- CARD: DIAGNÓSTICO DA TURMA -->
+    <div class="card" style="margin-top: 24px; border-left: 5px solid #FF6F00; background: #FFF8E1;">
+      <div class="section-title" style="color: #FF6F00; border-bottom: 1px solid #FFE0B2;">📈 Diagnóstico da Turma</div>
+      <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Descubra quais habilidades a turma mais errou e foque sua recuperação onde realmente importa!</p>
+      <div class="form-row" style="grid-template-columns: 1fr 1fr; margin-top: 12px;">
+        <div class="form-group" style="margin-bottom: 0;"><label>Selecione a Prova:</label><select id="selProvaDiagnostico" onchange="carregarDiagnostico()"><option value="">Carregando provas...</option></select></div>
+        <div class="form-group" style="margin-bottom: 0;"><label>Analisar por:</label><select id="tipoAnalise" onchange="carregarDiagnostico()"><option value="descritor">Descritor (SAEB)</option><option value="habilidade">Habilidade (BNCC)</option></select></div>
       </div>
+      <div id="areaGraficoDiagnostico" style="margin-top: 16px;"><p style="text-align: center; color: #999; font-style: italic;">Selecione uma prova para ver o diagnóstico.</p></div>
+    </div>
+
+    <!-- CARD: CORRETOR MANUAL (NOVO!) -->
+    <div class="card" style="margin-top: 24px; border-left: 5px solid #dc3545; background: #fff5f5;">
+      <div class="section-title" style="color: #dc3545; border-bottom: 1px solid #f5c6cb;">✏️ Corretor Manual de Prova</div>
+      <p style="font-size: 13px; color: #666; margin-bottom: 12px;">Marque as respostas diretamente no site e salve no banco. Ideal para alunos que o App OMR não corrigiu.</p>
+      <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+        <div class="form-group"><label>Turma:</label><select id="selTurmaCorretor" onchange="carregarAlunosCorretor()"><option value="">Selecione...</option></select></div>
+        <div class="form-group"><label>Prova:</label><select id="selProvaCorretor" onchange="carregarAlunosCorretor()"><option value="">Selecione...</option></select></div>
+      </div>
+      <div class="form-group"><label>Aluno:</label><select id="selAlunoCorretor" onchange="carregarRespostasAluno()"><option value="">Selecione a turma e prova primeiro...</option></select></div>
+      <div id="areaCorretorManual" style="margin-top: 16px;"><p style="text-align: center; color: #999; font-style: italic;">Selecione turma, prova e aluno para corrigir.</p></div>
     </div>
 
   </div> <!-- Fim do container -->
 </div> <!-- Fim do mainScreen -->
 
-<!-- Modal Colar -->
+<!-- Modais (Colar, IA, QR, Cartões, Recuperação) -->
 <div id="modalColar" class="modal">
   <div class="modal-content">
     <div class="modal-header"><h3>📋 Colar prova do Word/Docs</h3><button class="btn btn-sm" onclick="fecharModal('modalColar')">✕</button></div>
-    <p style="font-size: 13px; margin-bottom: 8px;">Cole no formato:</p>
-    <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; font-family: monospace; font-size: 12px; margin-bottom: 12px;">
-      1) Enunciado da questão | critério de correção | valor<br>2) Outra questão | critério | valor
-    </div>
+    <p style="font-size: 13px; margin-bottom: 8px;">Cole no formato: 1) Enunciado | critério | valor</p>
     <textarea id="textareaColar" style="width: 100%; min-height: 200px; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui..."></textarea>
     <div style="display: flex; gap: 8px; margin-top: 16px;">
       <button class="btn btn-secondary" style="flex: 1;" onclick="fecharModal('modalColar')">Cancelar</button>
@@ -213,96 +213,99 @@
   </div>
 </div>
 
-<!-- Modal Assistente IA -->
 <div id="modalIA" class="modal">
   <div class="modal-content">
-    <div class="modal-header">
-      <h3>🤖 Assistente Pedagógico IA</h3>
-      <button class="btn btn-sm" onclick="fecharModal('modalIA')">✕</button>
-    </div>
-    
+    <div class="modal-header"><h3>🤖 Assistente Pedagógico IA</h3><button class="btn btn-sm" onclick="fecharModal('modalIA')">✕</button></div>
     <div class="ia-tabs">
       <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
       <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar">🔍 Identificar Habilidade</div>
     </div>
-
-    <!-- ABA GERAR -->
+    <div class="ia-tabs">
+      <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
+      <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar"> Identificar</div>
+      <div class="ia-tab" onclick="mudarAbaIA('planejar')" id="tabPlanejar">📝 Planejar Aula</div> <!-- NOVA ABA -->
+    </div>
     <div id="abaGerar">
       <div class="form-row">
-        <div class="form-group">
-          <label>Fonte</label>
-          <select id="iaFonte"><option value="CP">Currículo Paulista</option><option value="SAEB">SAEB</option></select>
-        </div>
-        <div class="form-group">
-          <label>Ano</label>
-          <select id="iaAno"><option value="5">5º ano</option><option value="6" selected>6º ano</option><option value="9">9º ano</option></select>
-        </div>
-        <div class="form-group">
-          <label>Quantidade</label>
-          <select id="iaQtd"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-        </div>
+        <div class="form-group"><label>Fonte</label><select id="iaFonte"><option value="CP">Currículo Paulista</option><option value="SAEB">SAEB</option></select></div>
+        <div class="form-group"><label>Ano</label><select id="iaAno"><option value="5">5º ano</option><option value="6" selected>6º ano</option><option value="9">9º ano</option></select></div>
+        <div class="form-group"><label>Quantidade</label><select id="iaQtd"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
       </div>
       <div class="form-row">
-        <div class="form-group">
-          <label>Dificuldade</label>
-          <select id="iaDificuldade"><option value="fácil">Fácil</option><option value="média" selected>Média</option><option value="difícil">Difícil</option></select>
-        </div>
-        <div class="form-group" style="grid-column: span 2;">
-          <label>Contexto (opcional)</label>
-          <input type="text" id="iaContexto" placeholder="Ex: feira livre, mesada, horta da escola...">
-        </div>
+        <div class="form-group"><label>Dificuldade</label><select id="iaDificuldade"><option value="fácil">Fácil</option><option value="média" selected>Média</option><option value="difícil">Difícil</option></select></div>
+        <div class="form-group" style="grid-column: span 2;"><label>Contexto (opcional)</label><input type="text" id="iaContexto" placeholder="Ex: feira livre, mesada..."></div>
       </div>
-      
       <button class="btn btn-primary btn-sm" style="width: 100%; margin-bottom: 12px;" onclick="carregarMatrizIA()">🔄 Carregar Habilidades Disponíveis</button>
-      
-      <div class="form-group">
-        <label>Selecione as habilidades/descritores:</label>
+      <div class="form-group"><label>Selecione as habilidades/descritores:</label>
         <div id="iaListaHabilidades" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 6px; padding: 8px; background: #fafafa;">
           <p style="font-size: 12px; color: #666; text-align: center;">Clique em "Carregar Habilidades" primeiro.</p>
         </div>
       </div>
-
       <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarQuestoesIA()" id="btnGerarIA">✨ GERAR QUESTÕES COM IA</button>
-      
       <div id="iaResultadoGerar" style="margin-top: 16px;"></div>
     </div>
-
-    <!-- ABA IDENTIFICAR -->
     <div id="abaIdentificar" class="hidden">
-      <div class="form-group">
-        <label>Cole o enunciado da questão pronta:</label>
-        <textarea id="iaTextoIdentificar" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui o texto da questão..."></textarea>
-      </div>
+      <div class="form-group"><label>Cole o enunciado da questão pronta:</label><textarea id="iaTextoIdentificar" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui o texto da questão..."></textarea></div>
       <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="identificarHabilidadeIA()" id="btnIdentificarIA">🔍 IDENTIFICAR HABILIDADE</button>
       <div id="iaResultadoIdentificar" style="margin-top: 16px;"></div>
     </div>
-
   </div>
 </div>
+<!-- ABA PLANEJAR AULA -->
+    <div id="abaPlanejar" class="hidden">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tema da Aula:</label>
+          <input type="text" id="iaTemaAula" placeholder="Ex: Frações equivalentes">
+        </div>
+        <div class="form-group">
+          <label>Duração:</label>
+          <input type="text" id="iaDuracao" value="50 minutos">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Material Didático da Escola:</label>
+        <input type="text" id="iaMaterial" placeholder="Ex: Apostila do Sistema X, Livro didático Y...">
+      </div>
+      <div class="form-group">
+        <label>Perfil da Turma (Copie do Diagnóstico se quiser):</label>
+        <textarea id="iaPerfilTurma" rows="3" placeholder="Ex: A turma tem dificuldade em visualizar frações, mas são bons em cálculos simples..."></textarea>
+      </div>
+      <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarPlanoAula()" id="btnPlanejarIA">🚀 GERAR PLANO DE AULA</button>
+      <div id="iaResultadoPlanejar" style="margin-top: 16px;"></div>
+    </div>
 
-<!-- Modal QR -->
 <div id="modalQR" class="modal">
   <div class="modal-content" style="text-align: center;">
     <div class="modal-header"><h3>🔲 QR Code</h3><button class="btn btn-sm" onclick="fecharModal('modalQR')">✕</button></div>
     <p style="font-size: 13px; margin-bottom: 12px;" id="qrNome"></p>
     <img id="qrImg" style="width: 240px; height: 240px; border: 4px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.2);" alt="QR Code">
-    <p style="font-size: 12px; color: #888; margin: 12px 0;">Clique com o botão direito na imagem → <b>Salvar imagem</b>, e cole no canto da prova no Word.</p>
+    <p style="font-size: 12px; color: #888; margin: 12px 0;">Clique com o botão direito na imagem → <b>Salvar imagem</b>.</p>
     <a id="qrLink" target="_blank" class="btn btn-secondary" style="display: inline-block; text-decoration: none;">Abrir em nova aba</a>
   </div>
 </div>
 
-<!-- Modal Cartões -->
 <div id="modalCartoes" class="modal">
   <div class="modal-content" style="max-width: 800px;">
     <div class="modal-header"><h3>🪪 Folha de QRs</h3><button class="btn btn-sm" onclick="fecharModal('modalCartoes')">✕</button></div>
-    <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Aguarde as imagens carregarem e clique em Imprimir. Recorte e cole na prova (ou lamina para reutilizar).</p>
+    <p style="font-size: 12px; color: #888; margin-bottom: 12px;">Aguarde as imagens carregarem e clique em Imprimir.</p>
     <div id="areaImpressao"><div id="cartoesGrid"></div></div>
     <button class="btn btn-primary" style="width: 100%; margin-top: 16px;" onclick="window.print()">🖨️ Imprimir</button>
   </div>
 </div>
 
+<div id="modalRecuperacao" class="modal">
+  <div class="modal-content" style="max-width: 800px;">
+    <div class="modal-header"><h3>🚀 Plano de Recuperação Dirigida</h3><button class="btn btn-sm" onclick="fecharModal('modalRecuperacao')">✕</button></div>
+    <div id="areaPlanoRecuperacao"><p style="text-align: center; color: #666;">⏳ A IA está criando o plano...</p></div>
+    <div style="display: flex; gap: 8px; margin-top: 16px;">
+      <button class="btn btn-secondary" style="flex: 1;" onclick="fecharModal('modalRecuperacao')">Fechar</button>
+      <button class="btn btn-primary" style="flex: 1;" onclick="window.print()">🖨️ Imprimir Plano</button>
+    </div>
+  </div>
+</div>
+
 <script>
-  // CONFIGURAÇÕES
   const SUPABASE_URL = 'https://mkqnaiuplkqiitwxltli.supabase.co';
   const ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1rcW5haXVwbGtxaWl0d3hsdGxpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzOTg5MzMsImV4cCI6MjA5OTk3NDkzM30.65MoDC1gMNpNs6bCKZlCTyCn2ijaaA6y9DOnQgNxacA';
   const API_URL = 'https://omr-sistema-api.onrender.com';
@@ -342,11 +345,7 @@
   async function refrescarSessao() {
     if (!refreshToken) return false;
     try {
-      var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', {
-        method: 'POST',
-        headers: { 'apikey': ANON, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken })
-      });
+      var r = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token', { method: 'POST', headers: { 'apikey': ANON, 'Content-Type': 'application/json' }, body: JSON.stringify({ refresh_token: refreshToken }) });
       if (!r.ok) return false;
       var j = await r.json();
       if (j.access_token) { guardarSessao(j); return true; }
@@ -386,7 +385,9 @@
     novoForm();
     carregarProvas();
     carregarSelectsQR();
-    carregarProvasDiagnostico(); // <-- CHAMADA ADICIONADA AQUI
+    carregarProvasDiagnostico();
+    carregarSelectsPlanilha();
+    carregarSelectsCorretor(); // <-- Carrega o Corretor Manual
   }
 
   function novaQuestao() { return { enunciado: '', resposta: '', valor: '2', imagemUrl: null, file: null }; }
@@ -401,13 +402,10 @@
     questoes = [novaQuestao()];
     renderizarQuestoes();
   }
-
   function adicionarQuestao() { questoes.push(novaQuestao()); renderizarQuestoes(); }
   function removerQuestao(i) { if (questoes.length > 1) { questoes.splice(i, 1); renderizarQuestoes(); } }
   function atualizarQuestao(i, campo, valor) { questoes[i][campo] = valor; }
-  function anexarImagem(i, input) {
-    if (input.files && input.files[0]) { questoes[i].file = input.files[0]; renderizarQuestoes(); }
-  }
+  function anexarImagem(i, input) { if (input.files && input.files[0]) { questoes[i].file = input.files[0]; renderizarQuestoes(); } }
   function removerImagem(i) { questoes[i].file = null; questoes[i].imagemUrl = null; renderizarQuestoes(); }
 
   function renderizarQuestoes() {
@@ -418,14 +416,12 @@
       else if (q.imagemUrl) statusImg = '🖼️ Imagem de referência anexada ✅ <a href="' + q.imagemUrl + '" target="_blank">ver</a> • <a href="#" onclick="removerImagem(' + i + ');return false;">remover</a>';
       else statusImg = 'Sem imagem (opcional)';
       return '<div class="questao-card">' +
-        '<div class="questao-header"><div style="display:flex;align-items:center;gap:8px;">' +
-        '<div class="questao-num">' + (i + 1) + '</div><strong>Questão ' + (i + 1) + '</strong></div>' +
+        '<div class="questao-header"><div style="display:flex;align-items:center;gap:8px;"><div class="questao-num">' + (i + 1) + '</div><strong>Questão ' + (i + 1) + '</strong></div>' +
         '<button class="remove-btn" onclick="removerQuestao(' + i + ')">🗑️</button></div>' +
         '<div class="form-group"><label>Enunciado</label><textarea rows="4" onchange="atualizarQuestao(' + i + ', \'enunciado\', this.value)">' + q.enunciado + '</textarea></div>' +
         '<div class="form-group"><label>Resposta esperada / critério</label><textarea rows="4" onchange="atualizarQuestao(' + i + ', \'resposta\', this.value)">' + q.resposta + '</textarea></div>' +
         '<div class="form-row"><div class="form-group" style="max-width:150px;"><label>Valor</label><input type="number" step="0.1" value="' + q.valor + '" onchange="atualizarQuestao(' + i + ', \'valor\', this.value)"></div>' +
-        '<div class="form-group"><label>🖼️ Imagem do enunciado (gráfico/tabela)</label><input type="file" accept="image/*" onchange="anexarImagem(' + i + ', this)"><div class="img-status">' + statusImg + '</div></div></div>' +
-        '</div>';
+        '<div class="form-group"><label>🖼️ Imagem do enunciado</label><input type="file" accept="image/*" onchange="anexarImagem(' + i + ', this)"><div class="img-status">' + statusImg + '</div></div></div></div>';
     }).join('');
   }
 
@@ -450,27 +446,29 @@
     toast(novas.length + ' questão(ões) importada(s)!', 'success');
   }
 
-  // ========================================================================
-  // 🤖 FUNÇÕES DO ASSISTENTE DE IA
-  // ========================================================================
-  function abrirModalIA() { 
-    document.getElementById('modalIA').classList.add('active'); 
-    mudarAbaIA('gerar');
-    document.getElementById('iaResultadoGerar').innerHTML = '';
-    document.getElementById('iaResultadoIdentificar').innerHTML = '';
-  }
-  
+  function abrirModalIA() { document.getElementById('modalIA').classList.add('active'); mudarAbaIA('gerar'); document.getElementById('iaResultadoGerar').innerHTML = ''; document.getElementById('iaResultadoIdentificar').innerHTML = ''; }
+ 
   function mudarAbaIA(aba) {
+    // Esconde todas as abas
+    document.getElementById('abaGerar').classList.add('hidden');
+    document.getElementById('abaIdentificar').classList.add('hidden');
+    document.getElementById('abaPlanejar').classList.add('hidden');
+    
+    // Remove active de todos os botões
+    document.getElementById('tabGerar').classList.remove('active');
+    document.getElementById('tabIdentificar').classList.remove('active');
+    document.getElementById('tabPlanejar').classList.remove('active');
+
+    // Mostra a aba clicada
     if (aba === 'gerar') {
-      document.getElementById('tabGerar').classList.add('active');
-      document.getElementById('tabIdentificar').classList.remove('active');
       document.getElementById('abaGerar').classList.remove('hidden');
-      document.getElementById('abaIdentificar').classList.add('hidden');
-    } else {
-      document.getElementById('tabIdentificar').classList.add('active');
-      document.getElementById('tabGerar').classList.remove('active');
+      document.getElementById('tabGerar').classList.add('active');
+    } else if (aba === 'identificar') {
       document.getElementById('abaIdentificar').classList.remove('hidden');
-      document.getElementById('abaGerar').classList.add('hidden');
+      document.getElementById('tabIdentificar').classList.add('active');
+    } else if (aba === 'planejar') {
+      document.getElementById('abaPlanejar').classList.remove('hidden');
+      document.getElementById('tabPlanejar').classList.add('active');
     }
   }
 
@@ -479,140 +477,71 @@
     var ano = document.getElementById('iaAno').value;
     var container = document.getElementById('iaListaHabilidades');
     container.innerHTML = '<p style="text-align:center; color:#666;">Carregando...</p>';
-    
     try {
       var r = await fetch(API_URL + '/api/matriz?fonte=' + fonte + '&ano=' + ano);
       var j = await r.json();
       if (j.sucesso && j.itens) {
         matrizHabilidades = j.itens;
         container.innerHTML = matrizHabilidades.map(function(item) {
-          return '<label class="habilidade-item">' +
-            '<input type="checkbox" value="' + item.codigo + '"> ' +
-            '<strong>' + item.codigo + '</strong>: ' + item.descricao +
-            '</label>';
+          return '<label class="habilidade-item"><input type="checkbox" value="' + item.codigo + '"> <strong>' + item.codigo + '</strong>: ' + item.descricao + '</label>';
         }).join('');
-      } else {
-        container.innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar matriz.</p>';
-      }
-    } catch (e) {
-      container.innerHTML = '<p style="color:red; text-align:center;">Falha na conexão com a API.</p>';
-    }
+      } else { container.innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar matriz.</p>'; }
+    } catch (e) { container.innerHTML = '<p style="color:red; text-align:center;">Falha na conexão com a API.</p>'; }
   }
 
   async function gerarQuestoesIA() {
     var checkboxes = document.querySelectorAll('#iaListaHabilidades input[type="checkbox"]:checked');
     var codigos = Array.from(checkboxes).map(function(cb) { return cb.value; });
-    
     if (codigos.length === 0) { toast('Selecione pelo menos 1 habilidade!', 'error'); return; }
-    
     var btn = document.getElementById('btnGerarIA');
-    btn.textContent = '⏳ Gerando...';
-    btn.disabled = true;
-    
+    btn.textContent = '⏳ Gerando...'; btn.disabled = true;
     try {
-      var payload = {
-        codigos: codigos,
-        fonte: document.getElementById('iaFonte').value,
-        componente: 'Matemática',
-        ano: parseInt(document.getElementById('iaAno').value),
-        quantidade: parseInt(document.getElementById('iaQtd').value),
-        dificuldade: document.getElementById('iaDificuldade').value,
-        contexto: document.getElementById('iaContexto').value,
-        valor_padrao: 2.0
-      };
-      
-      var r = await fetch(API_URL + '/api/gerar_questoes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      var payload = { codigos: codigos, fonte: document.getElementById('iaFonte').value, componente: 'Matemática', ano: parseInt(document.getElementById('iaAno').value), quantidade: parseInt(document.getElementById('iaQtd').value), dificuldade: document.getElementById('iaDificuldade').value, contexto: document.getElementById('iaContexto').value, valor_padrao: 2.0 };
+      var r = await fetch(API_URL + '/api/gerar_questoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       var j = await r.json();
-      
       if (j.sucesso && j.questoes) {
         var html = '<h4 style="margin-bottom:8px;">Questões Geradas:</h4>';
         j.questoes.forEach(function(q, idx) {
-          html += '<div class="ia-preview-card">' +
-            '<strong>' + q.codigo + '</strong> (Questão ' + (idx+1) + ')<br>' +
+          html += '<div class="ia-preview-card"><strong>' + q.codigo + '</strong> (Questão ' + (idx+1) + ')<br>' +
             '<p style="font-size:13px; margin: 6px 0;"><strong>Enunciado:</strong> ' + q.enunciado + '</p>' +
             '<p style="font-size:13px; margin: 6px 0;"><strong>Resposta:</strong> ' + q.resposta_esperada + '</p>' +
             '<p style="font-size:13px; margin: 6px 0;"><strong>Valor:</strong> ' + q.valor + '</p>' +
-            '<button class="btn btn-primary btn-sm" onclick="adicionarQuestaoGerada(' + idx + ')">➕ Adicionar à Prova</button>' +
-            '</div>';
+            '<button class="btn btn-primary btn-sm" onclick="adicionarQuestaoGerada(' + idx + ')">➕ Adicionar à Prova</button></div>';
         });
         window.questoesGeradasTemp = j.questoes;
         document.getElementById('iaResultadoGerar').innerHTML = html;
         toast('Questões geradas com sucesso!', 'success');
-      } else {
-        toast('Erro: ' + (j.erro || 'Falha ao gerar'), 'error');
-      }
-    } catch (e) {
-      toast('Falha na conexão com a API: ' + e.message, 'error');
-    } finally {
-      btn.textContent = '✨ GERAR QUESTÕES COM IA';
-      btn.disabled = false;
-    }
+      } else { toast('Erro: ' + (j.erro || 'Falha ao gerar'), 'error'); }
+    } catch (e) { toast('Falha na conexão com a API: ' + e.message, 'error'); }
+    finally { btn.textContent = '✨ GERAR QUESTÕES COM IA'; btn.disabled = false; }
   }
 
   function adicionarQuestaoGerada(idx) {
     if (!window.questoesGeradasTemp || !window.questoesGeradasTemp[idx]) return;
     var q = window.questoesGeradasTemp[idx];
-    questoes.push({
-      enunciado: q.enunciado || '',
-      resposta: q.resposta_esperada || '',
-      valor: String(q.valor || 2),
-      imagemUrl: null,
-      file: null
-    });
-    renderizarQuestoes();
-    toast('Questão adicionada!', 'success');
+    questoes.push({ enunciado: q.enunciado || '', resposta: q.resposta_esperada || '', valor: String(q.valor || 2), imagemUrl: null, file: null });
+    renderizarQuestoes(); toast('Questão adicionada!', 'success');
   }
 
   async function identificarHabilidadeIA() {
     var texto = document.getElementById('iaTextoIdentificar').value.trim();
     if (texto.length < 10) { toast('Cole o texto completo da questão!', 'error'); return; }
-    
-    var btn = document.getElementById('btnIdentificarIA');
-    btn.textContent = '⏳ Identificando...';
-    btn.disabled = true;
-    
+    var btn = document.getElementById('btnIdentificarIA'); btn.textContent = '⏳ Identificando...'; btn.disabled = true;
     try {
-      var payload = {
-        texto: texto,
-        fonte: document.getElementById('iaFonte').value,
-        componente: 'Matemática',
-        ano: parseInt(document.getElementById('iaAno').value)
-      };
-      
-      var r = await fetch(API_URL + '/api/identificar_habilidade', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      var payload = { texto: texto, fonte: document.getElementById('iaFonte').value, componente: 'Matemática', ano: parseInt(document.getElementById('iaAno').value) };
+      var r = await fetch(API_URL + '/api/identificar_habilidade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       var j = await r.json();
-      
       if (j.sucesso && j.resultados) {
         var html = '<h4 style="margin-bottom:8px;">Habilidades Identificadas:</h4>';
         j.resultados.forEach(function(res) {
-          html += '<div class="ia-preview-card">' +
-            '<strong>' + res.codigo + '</strong> - Aderência: <strong>' + res.aderencia + '%</strong><br>' +
-            '<p style="font-size:13px; margin: 6px 0; font-style:italic;">' + res.justificativa + '</p>' +
-            '</div>';
+          html += '<div class="ia-preview-card"><strong>' + res.codigo + '</strong> - Aderência: <strong>' + res.aderencia + '%</strong><br><p style="font-size:13px; margin: 6px 0; font-style:italic;">' + res.justificativa + '</p></div>';
         });
         document.getElementById('iaResultadoIdentificar').innerHTML = html;
-      } else {
-        toast('Erro: ' + (j.erro || 'Falha ao identificar'), 'error');
-      }
-    } catch (e) {
-      toast('Falha na conexão com a API: ' + e.message, 'error');
-    } finally {
-      btn.textContent = '🔍 IDENTIFICAR HABILIDADE';
-      btn.disabled = false;
-    }
+      } else { toast('Erro: ' + (j.erro || 'Falha ao identificar'), 'error'); }
+    } catch (e) { toast('Falha na conexão com a API: ' + e.message, 'error'); }
+    finally { btn.textContent = '🔍 IDENTIFICAR HABILIDADE'; btn.disabled = false; }
   }
 
-  // ========================================================================
-  // FUNÇÕES SUPABASE E OUTRAS
-  // ========================================================================
   async function sbFetch(method, path, body, prefer) {
     var opts = { method: method, headers: headersCom(prefer) };
     if (body !== undefined) opts.body = JSON.stringify(body);
@@ -630,16 +559,7 @@
     var ext = (file.name.split('.').pop() || 'png').toLowerCase();
     var path = 'q_' + Date.now() + '_' + Math.floor(Math.random() * 10000) + '.' + ext;
     async function tentar(bearer) {
-      return await fetch(SUPABASE_URL + '/storage/v1/object/enunciados/' + path, {
-        method: 'POST',
-        headers: {
-          'apikey': ANON,
-          'Authorization': 'Bearer ' + bearer,
-          'Content-Type': file.type || 'image/png',
-          'x-upsert': 'true'
-        },
-        body: file
-      });
+      return await fetch(SUPABASE_URL + '/storage/v1/object/enunciados/' + path, { method: 'POST', headers: { 'apikey': ANON, 'Authorization': 'Bearer ' + bearer, 'Content-Type': file.type || 'image/png', 'x-upsert': 'true' }, body: file });
     }
     var r = await tentar(token || ANON);
     if (!r.ok && token) { await refrescarSessao(); r = await tentar(token || ANON); }
@@ -648,7 +568,6 @@
     return SUPABASE_URL + '/storage/v1/object/public/enunciados/' + path;
   }
 
-  // ===== QR =====
   function mostrarQR(id, nome) {
     var dados = 'OMRPROVA:' + id;
     var url = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(dados);
@@ -724,7 +643,6 @@
     document.getElementById('modalCartoes').classList.add('active');
   }
 
-  // ===== EDITAR =====
   async function editarProva(id) {
     try {
       var r1 = await sbFetch('GET', '/rest/v1/avaliacoes?id=eq.' + id + '&select=*');
@@ -735,9 +653,7 @@
       document.getElementById('bimestre').value = String(a.bimestre);
       document.getElementById('peso').value = String(a.peso_media);
       document.getElementById('disciplina').value = a.disciplina || 'Matemática';
-      questoes = qs.map(function (q) {
-        return { enunciado: q.enunciado, resposta: q.resposta_esperada, valor: String(q.valor), imagemUrl: q.imagem_url, file: null };
-      });
+      questoes = qs.map(function (q) { return { enunciado: q.enunciado, resposta: q.resposta_esperada, valor: String(q.valor), imagemUrl: q.imagem_url, file: null }; });
       if (questoes.length === 0) questoes = [novaQuestao()];
       editandoId = id;
       document.getElementById('bannerEdicao').classList.remove('hidden');
@@ -756,9 +672,7 @@
     var disciplina = document.getElementById('disciplina').value;
     if (!nome) { toast('Dê um nome para a prova!', 'error'); return; }
     if (questoes.length === 0) { toast('Adicione ao menos uma questão!', 'error'); return; }
-    for (var i = 0; i < questoes.length; i++) {
-      if (!questoes[i].enunciado.trim()) { toast('Questão ' + (i + 1) + ' sem enunciado!', 'error'); return; }
-    }
+    for (var i = 0; i < questoes.length; i++) { if (!questoes[i].enunciado.trim()) { toast('Questão ' + (i + 1) + ' sem enunciado!', 'error'); return; } }
     try {
       for (var k = 0; k < questoes.length; k++) {
         if (questoes[k].file) {
@@ -774,29 +688,17 @@
         await sbFetch('DELETE', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + editandoId);
         idAval = editandoId;
       } else {
-        var r1 = await sbFetch('POST', '/rest/v1/avaliacoes', {
-          nome: nome, data_prova: new Date().toISOString().split('T')[0],
-          numero_questoes: questoes.length, bimestre: bimestre, peso_media: peso,
-          disciplina: disciplina, modo_correcao: 'aberta', tipo: 'Prova Aberta'
-        }, 'return=representation');
+        var r1 = await sbFetch('POST', '/rest/v1/avaliacoes', { nome: nome, data_prova: new Date().toISOString().split('T')[0], numero_questoes: questoes.length, bimestre: bimestre, peso_media: peso, disciplina: disciplina, modo_correcao: 'aberta', tipo: 'Prova Aberta' }, 'return=representation');
         if (!r1.ok) { toast('Erro ao criar prova: ' + msgErro(await r1.json()), 'error'); return; }
         idAval = (await r1.json())[0].id;
       }
-
       var linhas = questoes.map(function (q, idx) {
-        return {
-          id_avaliacao: idAval, numero: idx + 1,
-          enunciado: q.enunciado.trim(), resposta_esperada: q.resposta.trim(),
-          valor: parseFloat(String(q.valor).replace(',', '.')) || 2,
-          imagem_url: q.imagemUrl
-        };
+        return { id_avaliacao: idAval, numero: idx + 1, enunciado: q.enunciado.trim(), resposta_esperada: q.resposta.trim(), valor: parseFloat(String(q.valor).replace(',', '.')) || 2, imagem_url: q.imagemUrl };
       });
       var r2 = await sbFetch('POST', '/rest/v1/questoes_abertas', linhas);
       if (!r2.ok) { toast('Erro ao salvar questões: ' + msgErro(await r2.json()), 'error'); return; }
-
       toast('✅ Prova salva com ' + questoes.length + ' questão(ões)!', 'success');
-      novoForm();
-      carregarProvas();
+      novoForm(); carregarProvas();
     } catch (e) { toast('Falha: ' + e.message, 'error'); }
   }
 
@@ -809,12 +711,9 @@
       var data = await r.json();
       if (!data || data.length === 0) { lista.innerHTML = '<p style="color:#888;text-align:center;padding:20px;">Nenhuma prova cadastrada ainda.</p>'; return; }
       lista.innerHTML = data.map(function (p) {
-        return '<div class="prova-item"><div class="prova-item-info"><strong>' + p.nome + '</strong>' +
-          '<div class="prova-item-meta">' + p.numero_questoes + ' questões • ' + p.bimestre + 'º bimestre • ' + p.data_prova + '</div></div>' +
-          '<div style="display:flex;gap:6px;">' +
-          '<button class="btn btn-primary btn-sm" onclick="mostrarQR(' + p.id + ', \'' + String(p.nome).replace(/'/g, '') + '\')">🔲</button>' +
-          '<button class="btn btn-warn btn-sm" onclick="editarProva(' + p.id + ')">✏️</button>' +
-          '<button class="btn btn-danger btn-sm" onclick="excluirProva(' + p.id + ')">🗑️</button></div></div>';
+        return '<div class="prova-item"><div class="prova-item-info"><strong>' + p.nome + '</strong><div class="prova-item-meta">' + p.numero_questoes + ' questões • ' + p.bimestre + 'º bimestre • ' + p.data_prova + '</div></div>' +
+          '<div style="display:flex;gap:6px;"><button class="btn btn-primary btn-sm" onclick="mostrarQR(' + p.id + ', \'' + String(p.nome).replace(/'/g, '') + '\')">🔲</button>' +
+          '<button class="btn btn-warn btn-sm" onclick="editarProva(' + p.id + ')">✏️</button><button class="btn btn-danger btn-sm" onclick="excluirProva(' + p.id + ')">🗑️</button></div></div>';
       }).join('');
     } catch (e) { lista.innerHTML = '<p style="color:#dc3545;text-align:center;padding:20px;">Falha de conexão.</p>'; }
   }
@@ -824,17 +723,11 @@
     try {
       await sbFetch('DELETE', '/rest/v1/questoes_abertas?id_avaliacao=eq.' + id);
       await sbFetch('DELETE', '/rest/v1/avaliacoes?id=eq.' + id);
-      toast('Prova excluída!', 'success');
-      carregarProvas();
+      toast('Prova excluída!', 'success'); carregarProvas();
     } catch (e) { toast('Erro: ' + e.message, 'error'); }
   }
 
-  (async function () {
-    if (token && userEmail) {
-      await refrescarSessao();
-      mostrarPrincipal(userEmail);
-    }
-  })();
+  (async function () { if (token && userEmail) { await refrescarSessao(); mostrarPrincipal(userEmail); } })();
 
   // ========================================================================
   // 📊 FUNÇÕES DO DIAGNÓSTICO DA TURMA
@@ -842,148 +735,450 @@
   async function carregarProvasDiagnostico() {
     var sel = document.getElementById('selProvaDiagnostico');
     if (sel.options.length > 1) return;
-    
     try {
       var r = await sbFetch('GET', '/rest/v1/avaliacoes?select=id,nome,numero_questoes&order=id.desc');
       var provas = await r.json();
-      sel.innerHTML = '<option value="">Selecione uma prova...</option>' + 
-        provas.map(function(p) {
-          return '<option value="' + p.id + '" data-nome="' + p.nome + '">' + p.nome + '</option>';
-        }).join('');
-    } catch(e) {
-      sel.innerHTML = '<option value="">Erro ao carregar</option>';
-    }
+      sel.innerHTML = '<option value="">Selecione uma prova...</option>' + provas.map(function(p) { return '<option value="' + p.id + '" data-nome="' + p.nome + '">' + p.nome + '</option>'; }).join('');
+    } catch(e) { sel.innerHTML = '<option value="">Erro ao carregar</option>'; }
   }
 
   async function carregarDiagnostico() {
     var sel = document.getElementById('selProvaDiagnostico');
     var idProva = sel.value;
     var area = document.getElementById('areaGraficoDiagnostico');
-    
-    if (!idProva) {
-      area.innerHTML = '<p style="text-align: center; color: #999; font-style: italic;">Selecione uma prova para ver o diagnóstico.</p>';
-      return;
-    }
-    
+    if (!idProva) { area.innerHTML = '<p style="text-align: center; color: #999; font-style: italic;">Selecione uma prova para ver o diagnóstico.</p>'; return; }
     area.innerHTML = '<p style="text-align: center; color: #666;">⏳ Calculando diagnóstico...</p>';
-    
     try {
-      // 1. Buscar questões (Tentamos a tabela 'questoes' para objetiva)
       var rQuestoes = await sbFetch('GET', '/rest/v1/questoes?id_avaliacao=eq.' + idProva + '&select=id,numero,descritor,habilidade');
-      
-      // VERIFICAÇÃO DE SEGURANÇA: Se a requisição falhou, pegamos o erro real do Supabase
-      if (!rQuestoes.ok) {
-        var erroQ = await rQuestoes.json();
-        throw new Error("Erro no banco: " + (erroQ.message || erroQ.hint || rQuestoes.status));
-      }
-      
+      if (!rQuestoes.ok) { var erroQ = await rQuestoes.json(); throw new Error("Erro no banco: " + (erroQ.message || erroQ.hint || rQuestoes.status)); }
       var questoes = await rQuestoes.json();
-      
-      // GARANTIR QUE É UMA LISTA (ARRAY)
-      if (!Array.isArray(questoes)) {
-        throw new Error("Formato de dados inválido.");
-      }
-
-      // 2. Buscar respostas dos alunos
+      if (!Array.isArray(questoes)) { throw new Error("Formato de dados inválido."); }
       var rRespostas = await sbFetch('GET', '/rest/v1/respostas?id_avaliacao=eq.' + idProva + '&select=id_questao,correta');
-      
-      if (!rRespostas.ok) {
-        var erroR = await rRespostas.json();
-        throw new Error("Erro ao buscar respostas: " + (erroR.message || erroR.hint || rRespostas.status));
-      }
-
+      if (!rRespostas.ok) { var erroR = await rRespostas.json(); throw new Error("Erro ao buscar respostas: " + (erroR.message || erroR.hint || rRespostas.status)); }
       var respostas = await rRespostas.json();
-      if (!Array.isArray(respostas)) {
-        respostas = []; // Se não houver respostas, tratamos como lista vazia
-      }
+      if (!Array.isArray(respostas)) { respostas = []; }
+      if (questoes.length === 0) { area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Esta prova não possui questões registradas com descritor/habilidade.</p>'; return; }
+      if (respostas.length === 0) { area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhum aluno corrigiu esta prova ainda no sistema.</p>'; return; }
       
-      // 3. Validações de dados
-      if (questoes.length === 0) {
-        area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Esta prova não possui questões registradas com descritor/habilidade.</p>';
-        return;
-      }
-      
-      if (respostas.length === 0) {
-        area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhum aluno corrigiu esta prova ainda no sistema.</p>';
-        return;
-      }
-      
-      // 4. Agrupar pela coluna escolhida (Descritor ou Habilidade)
       var tipoEscolhido = document.getElementById('tipoAnalise').value; 
       var tituloEixo = tipoEscolhido === 'habilidade' ? 'Habilidade (BNCC)' : 'Descritor (SAEB)';
-
       var mapaAgrupado = {};
       questoes.forEach(function(q) {
         var chave = q[tipoEscolhido] || 'Não classificado';
         if (!mapaAgrupado[chave]) mapaAgrupado[chave] = { total: 0, acertos: 0 };
       });
-      
       respostas.forEach(function(r) {
-        var questao = questoes.find(function(q) { return q.numero === r.id_questao; });
+        var questao = questoes.find(function(q) { return String(q.numero) === String(r.id_questao); });
         if (questao) {
           var chave = questao[tipoEscolhido] || 'Não classificado';
           mapaAgrupado[chave].total++;
           if (r.correta) mapaAgrupado[chave].acertos++;
         }
       });
-      
-      // 5. Calcular percentuais e ordenar
       var resultados = Object.keys(mapaAgrupado).map(function(chave) {
         var dados = mapaAgrupado[chave];
         var percentual = dados.total > 0 ? (dados.acertos / dados.total * 100) : 0;
-        return {
-          chave: chave,
-          total: dados.total,
-          acertos: dados.acertos,
-          percentual: percentual.toFixed(1)
-        };
+        return { chave: chave, total: dados.total, acertos: dados.acertos, percentual: percentual.toFixed(1) };
       }).sort(function(a, b) { return a.percentual - b.percentual; });
       
-      // 6. Gerar HTML do gráfico de barras
       var html = '<h4 style="margin-bottom: 12px; color: #333;">📊 Desempenho por ' + tituloEixo + ' (do pior para o melhor):</h4>';
-      
       resultados.forEach(function(item) {
         var cor = item.percentual < 50 ? '#dc3545' : (item.percentual < 70 ? '#ffc107' : '#28a745');
         var emoji = item.percentual < 50 ? '🔴' : (item.percentual < 70 ? '🟡' : '🟢');
-        
-        html += '<div style="margin-bottom: 12px;">';
-        html += '<div style="display: flex; justify-content: space-between; margin-bottom: 4px;">';
-        html += '<strong>' + emoji + ' ' + item.chave + '</strong>';
-        html += '<span style="font-weight: bold; color: ' + cor + ';">' + item.percentual + '% de acerto</span>';
-        html += '</div>';
-        html += '<div style="background: #e0e0e0; border-radius: 6px; height: 24px; overflow: hidden;">';
-        html += '<div style="background: ' + cor + '; height: 100%; width: ' + item.percentual + '%; transition: width 0.5s;"></div>';
-        html += '</div>';
-        html += '<div style="font-size: 11px; color: #666; margin-top: 2px;">' + item.acertos + ' acertos de ' + item.total + ' respostas</div>';
-        html += '</div>';
+        html += '<div style="margin-bottom: 12px;"><div style="display: flex; justify-content: space-between; margin-bottom: 4px;">' +
+          '<strong>' + emoji + ' ' + item.chave + '</strong><span style="font-weight: bold; color: ' + cor + ';">' + item.percentual + '% de acerto</span></div>' +
+          '<div style="background: #e0e0e0; border-radius: 6px; height: 24px; overflow: hidden;"><div style="background: ' + cor + '; height: 100%; width: ' + item.percentual + '%; transition: width 0.5s;"></div></div>' +
+          '<div style="font-size: 11px; color: #666; margin-top: 2px;">' + item.acertos + ' acertos de ' + item.total + ' respostas</div></div>';
       });
       
-      // 7. Adicionar botão de Plano de Recuperação
       var itensRuins = resultados.filter(function(item) { return item.percentual < 50; });
+      window.itensRuinsAtual = itensRuins; window.tipoAnaliseAtual = tipoEscolhido;
       if (itensRuins.length > 0) {
-        html += '<div style="margin-top: 20px; padding: 16px; background: #FFE0B2; border-radius: 8px; border-left: 4px solid #FF6F00;">';
-        html += '<h4 style="color: #E65100; margin-bottom: 8px;">🎯 Foco da Recuperação:</h4>';
-        html += '<p style="font-size: 13px; color: #333;">Os itens abaixo precisam de atenção urgente:</p>';
-        html += '<ul style="margin: 8px 0; padding-left: 20px;">';
-        itensRuins.forEach(function(item) {
-          html += '<li><strong>' + item.chave + '</strong> (' + item.percentual + '% de acerto)</li>';
-        });
-        html += '</ul>';
-        html += '<button class="btn btn-ia" style="width: 100%; margin-top: 8px;" onclick="gerarPlanoRecuperacao(' + idProva + ')">✨ Gerar Plano de Recuperação com IA</button>';
-        html += '</div>';
+        html += '<div style="margin-top: 20px; padding: 16px; background: #FFE0B2; border-radius: 8px; border-left: 4px solid #FF6F00;">' +
+          '<h4 style="color: #E65100; margin-bottom: 8px;">🎯 Foco da Recuperação:</h4><p style="font-size: 13px; color: #333;">Os itens abaixo precisam de atenção urgente:</p><ul style="margin: 8px 0; padding-left: 20px;">';
+        itensRuins.forEach(function(item) { html += '<li><strong>' + item.chave + '</strong> (' + item.percentual + '% de acerto)</li>'; });
+        html += '</ul><button class="btn btn-ia" style="width: 100%; margin-top: 8px;" onclick="gerarPlanoRecuperacao(' + idProva + ')">✨ Gerar Plano de Recuperação com IA</button></div>';
       }
-      
       area.innerHTML = html;
-      
     } catch(e) {
       console.error(e);
-      // Agora a tela vai mostrar EXATAMENTE qual é o erro do banco de dados!
       area.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 20px; background: #ffe6e6; border-radius: 8px;">❌ <strong>Erro:</strong> ' + e.message + '<br><small>Verifique se a prova é do tipo "Objetiva" (tabela questoes) e se as colunas descritor/habilidade estão preenchidas.</small></p>';
     }
   }
 
-  function gerarPlanoRecuperacao(idProva) {
-    alert('🚧 Em breve: A IA vai gerar atividades de recuperação focadas nos descritores com menor desempenho!');
+  async function gerarPlanoRecuperacao(idProva) {
+    var itens = window.itensRuinsAtual;
+    if (!itens || itens.length === 0) {
+      toast('Não há itens com baixo desempenho para gerar plano.', 'error');
+      return;
+    }
+
+    // 1️⃣ PERGUNTA A QUANTIDADE DE ATIVIDADES
+    var qtd = prompt('Quantas atividades de recuperação você deseja gerar?', '3');
+    if (!qtd) return; // Se o usuário cancelar, para aqui
+
+    // 2️⃣ PERGUNTA ANO E DISCIPLINA
+    var ano = prompt('Para qual ano é o plano de recuperação?', '6');
+    if (!ano) return;
+    var componente = prompt('Qual a disciplina?', 'Matemática');
+    if (!componente) return;
+
+    // 3️⃣ ABRE O MODAL COM MENSAGEM DE CARREGAMENTO
+    var area = document.getElementById('areaPlanoRecuperacao');
+    area.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="font-size: 18px; color: #6f42c1;">🤖 A IA está criando o plano...</p><p style="color: #666; margin-top: 8px;">Gerando ' + qtd + ' atividades focadas nos descritores/habilidades com menor desempenho</p></div>';
+    document.getElementById('modalRecuperacao').classList.add('active');
+
+    try {
+      // 4️⃣ ENVIA OS DADOS PARA O BACKEND (INCLUINDO A QUANTIDADE)
+      var r = await fetch(API_URL + '/api/gerar_plano_recuperacao', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itens_ruins: itens.map(function(i) { return i.chave; }),
+          tipo_analise: window.tipoAnaliseAtual === 'habilidade' ? 'Habilidade' : 'Descritor',
+          ano: parseInt(ano),
+          componente: componente,
+          quantidade: parseInt(qtd) // <-- AQUI ESTÁ A MÁGICA: enviamos a quantidade escolhida
+        })
+      });
+
+      var j = await r.json();
+
+      if (j.sucesso && j.plano) {
+        var plano = j.plano;
+        var html = '';
+
+        // Cabeçalho do Plano
+        html += '<div style="background: linear-gradient(135deg, #6f42c1, #4A148C); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
+        html += '<h2 style="margin: 0 0 8px 0;">📋 ' + (plano.titulo || 'Plano de Recuperação Dirigida') + '</h2>';
+        html += '<p style="margin: 0; font-size: 14px; opacity: 0.95;">' + (plano.plano || plano.justificativa || '') + '</p>';
+        html += '<p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.8;">🎯 Foco: ' + itens.map(function(i) { return i.chave; }).join(', ') + '</p>';
+        html += '</div>';
+
+        // Lista de Atividades
+        if (plano.atividades && plano.atividades.length > 0) {
+          html += '<h3 style="color: #4A148C; margin-bottom: 12px;">📚 Atividades Sugeridas</h3>';
+          plano.atividades.forEach(function(atv, idx) {
+            html += '<div style="background: #f9f5ff; border-left: 4px solid #6f42c1; padding: 16px; margin-bottom: 12px; border-radius: 6px;">';
+            html += '<h4 style="color: #6f42c1; margin: 0 0 8px 0;">Atividade ' + (idx + 1) + ': ' + (atv.titulo || 'Sem título') + '</h4>';
+            if (atv.descricao) {
+              html += '<p style="margin: 0 0 8px 0; color: #333;"><strong>Como aplicar:</strong> ' + atv.descricao + '</p>';
+            }
+            if (atv.exemplo_pratico && atv.exemplo_pratico !== '-') {
+              html += '<p style="margin: 0; padding: 10px; background: white; border-radius: 4px; color: #555; font-style: italic;"><strong>💡 Exemplo:</strong> ' + atv.exemplo_pratico + '</p>';
+            }
+            html += '</div>';
+          });
+        }
+
+        // Sugestões adicionais
+        if (plano.sugestoes && plano.sugestoes.length > 0) {
+          html += '<div style="background: #FFF8E1; padding: 16px; border-radius: 8px; border-left: 4px solid #FF6F00; margin-top: 16px;">';
+          html += '<h4 style="color: #E65100; margin: 0 0 8px 0;">💡 Sugestões Adicionais</h4>';
+          html += '<ul style="margin: 0; padding-left: 20px;">';
+          plano.sugestoes.forEach(function(s) {
+            html += '<li style="margin-bottom: 4px;">' + s + '</li>';
+          });
+          html += '</ul></div>';
+        }
+
+        // Rodapé
+        html += '<p style="text-align: center; color: #999; font-size: 11px; margin-top: 20px; font-style: italic;">Plano gerado por IA (modelo: ' + (j.modelo || 'Gemini') + ') em ' + new Date().toLocaleString('pt-BR') + '</p>';
+
+        area.innerHTML = html;
+        toast('Plano de recuperação gerado com sucesso!', 'success');
+      } else {
+        area.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 20px;">❌ Erro: ' + (j.erro || 'Falha ao gerar plano') + '</p>';
+        toast('Erro ao gerar plano', 'error');
+      }
+    } catch(e) {
+      console.error(e);
+      area.innerHTML = '<p style="text-align: center; color: #dc3545; padding: 20px;">❌ Falha na conexão: ' + e.message + '</p>';
+      toast('Falha na conexão com a IA', 'error');
+    }
+  }
+
+  // ========================================================================
+  // 📋 FUNÇÕES DE EXPORTAÇÃO PARA PLANILHA
+  // ========================================================================
+  async function carregarSelectsPlanilha() {
+    try {
+      var rt = await sbFetch('GET', '/rest/v1/turmas?select=id,nome&order=nome.asc');
+      var turmas = await rt.json();
+      document.getElementById('selTurmaPlanilha').innerHTML = '<option value="">Selecione...</option>' + turmas.map(function(t) { return '<option value="' + t.id + '">' + t.nome + '</option>'; }).join('');
+      var rp = await sbFetch('GET', '/rest/v1/avaliacoes?select=id,nome,modo_correcao&order=id.desc');
+      var provas = await rp.json();
+      document.getElementById('selProvaPlanilha').innerHTML = '<option value="">Selecione...</option>' + provas.map(function(p) { var tag = p.modo_correcao === 'aberta' ? ' (aberta)' : ' (objetiva)'; return '<option value="' + p.id + '">' + p.nome + tag + '</option>'; }).join('');
+    } catch(e) { console.error(e); }
+  }
+
+  async function gerarTabelaPlanilha() {
+  var turmaId = document.getElementById('selTurmaPlanilha').value;
+  var provaId = document.getElementById('selProvaPlanilha').value;
+  var area = document.getElementById('areaTabelaPlanilha');
+
+  if (!turmaId || !provaId) {
+    toast('Selecione a turma e a prova!', 'error');
+    return;
+  }
+
+  area.innerHTML = '<p style="text-align: center; color: #666;"> Gerando tabela...</p>';
+
+  try {
+    // 🔥 BUSCA 1: Todos os alunos da turma
+    var rAlunos = await sbFetch('GET', '/rest/v1/alunos?id_turma=eq.' + turmaId + '&select=id,nome_completo,numero_chamada&order=numero_chamada.asc');
+    var alunos = await rAlunos.json();
+    if (!Array.isArray(alunos) || alunos.length === 0) {
+      area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhum aluno encontrado nesta turma.</p>';
+      return;
+    }
+
+    // 🔥 BUSCA 2: Questões da prova
+    var rQuestoes = await sbFetch('GET', '/rest/v1/questoes?id_avaliacao=eq.' + provaId + '&select=id,numero&order=numero.asc');
+    var questoes = await rQuestoes.json();
+    if (!Array.isArray(questoes)) questoes = [];
+
+    if (questoes.length === 0) {
+      area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhuma questão encontrada para esta prova.</p>';
+      return;
+    }
+
+    // 🔥 BUSCA 3: Respostas FILTRADAS apenas pelos alunos desta turma
+    var idsAlunos = alunos.map(function(a) { return a.id; }).join(',');
+    var rRespostas = await sbFetch('GET', '/rest/v1/respostas?id_avaliacao=eq.' + provaId + '&id_aluno=in.(' + idsAlunos + ')&select=id_aluno,id_questao,resposta_aluno,correta');
+    var respostas = await rRespostas.json();
+    if (!Array.isArray(respostas)) respostas = [];
+
+    // 🔥 AGRUPAR RESPOSTAS POR ALUNO
+    var respostasPorAluno = {};
+    respostas.forEach(function(resp) {
+      var alunoId = resp.id_aluno;
+      if (!respostasPorAluno[alunoId]) {
+        respostasPorAluno[alunoId] = {};
+      }
+      respostasPorAluno[alunoId][resp.id_questao] = {
+        resposta: resp.resposta_aluno || '',
+        correta: resp.correta
+      };
+    });
+
+    // 🔥 MONTAR TABELA HTML
+    var html = '<div style="overflow-x: auto;">';
+    html += '<table id="tabelaPlanilha" style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: Arial;">';
+
+    // Cabeçalho
+    html += '<thead><tr style="background: #e0e0e0;">';
+    html += '<th style="border: 1px solid #999; padding: 6px;">Nº</th>';
+    html += '<th style="border: 1px solid #999; padding: 6px;">Aluno</th>';
+    html += '<th style="border: 1px solid #999; padding: 6px;">Status</th>';
+    questoes.forEach(function(q) {
+      html += '<th style="border: 1px solid #999; padding: 6px;">Q' + q.numero + '</th>';
+    });
+    html += '</tr></thead><tbody>';
+
+    // Linhas dos alunos
+    alunos.forEach(function(aluno) {
+      var respostasAluno = respostasPorAluno[aluno.id] || {};
+      var temRespostas = Object.keys(respostasAluno).length > 0;
+      var status = temRespostas ? 'Corrigido' : 'Pendente';
+      var corStatus = temRespostas ? '#28a745' : '#ffc107';
+
+      html += '<tr>';
+      html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' + (aluno.numero_chamada || '-') + '</td>';
+      html += '<td style="border: 1px solid #ccc; padding: 4px;">' + (aluno.nome_completo || 'Sem nome') + '</td>';
+      html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center; color: ' + corStatus + '; font-weight: bold;">' + status + '</td>';
+
+      questoes.forEach(function(q) {
+        var resp = respostasAluno[q.numero];
+        var respostaTexto = '';
+        var corFundo = '#fff';
+
+        if (resp) {
+          respostaTexto = resp.resposta || (resp.correta ? '✓' : '✗');
+          corFundo = resp.correta ? '#d4edda' : (resp.resposta ? '#f8d7da' : '#fff');
+        }
+
+        html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center; background: ' + corFundo + ';">' + respostaTexto + '</td>';
+      });
+
+      html += '</tr>';
+    });
+
+    html += '</tbody></table></div>';
+
+    // Botões de copiar
+    html += '<div style="display: flex; gap: 8px; margin-top: 12px;">';
+    html += '<button class="btn btn-primary" style="flex: 1; padding: 12px;" onclick="copiarParaPlanilha()">📋 COPIAR TUDO</button>';
+    html += '<button class="btn btn-secondary" style="flex: 1; padding: 12px;" onclick="copiarApenasRespostas()">📋 COPIAR APENAS RESPOSTAS</button>';
+    html += '</div>';
+    html += '<p style="font-size: 11px; color: #666; text-align: center; margin-top: 8px;">💡 Use o primeiro botão para planilhas novas. Use o segundo para colar apenas as respostas na planilha da escola.</p>';
+
+    area.innerHTML = html;
+    toast('✅ Tabela gerada com sucesso! ' + alunos.length + ' alunos carregados.', 'success');
+
+  } catch(e) {
+    console.error(e);
+    area.innerHTML = '<p style="text-align: center; color: #dc3545;">❌ Erro: ' + e.message + '</p>';
+  }
+}
+
+  function copiarParaPlanilha() {
+    var tabela = document.getElementById('tabelaPlanilha');
+    if (!tabela) { toast('Gere a tabela primeiro!', 'error'); return; }
+    var linhas = tabela.querySelectorAll('tr'); var textoTSV = '';
+    linhas.forEach(function(linha) {
+      var celulas = linha.querySelectorAll('th, td'); var valores = [];
+      celulas.forEach(function(celula) { valores.push(celula.innerText.replace(/\n/g, ' ').trim()); });
+      textoTSV += valores.join('\t') + '\n';
+    });
+    navigator.clipboard.writeText(textoTSV).then(function() { toast('✅ Tabela completa copiada! Cole no Google Sheets com Ctrl+V', 'success'); }).catch(function() {
+      var textarea = document.createElement('textarea'); textarea.value = textoTSV; document.body.appendChild(textarea); textarea.select(); document.execCommand('copy'); document.body.removeChild(textarea);
+      toast('✅ Tabela completa copiada!', 'success');
+    });
+  }
+
+  function copiarApenasRespostas() {
+    var tabela = document.getElementById('tabelaPlanilha');
+    if (!tabela) { toast('Gere a tabela primeiro!', 'error'); return; }
+    var linhas = tabela.querySelectorAll('tr'); var textoTSV = '';
+    var linhasDados = Array.from(linhas).slice(1);
+    linhasDados.forEach(function(linha) {
+      var celulas = linha.querySelectorAll('th, td');
+      var celulasRespostas = Array.from(celulas).slice(3); 
+      var valores = [];
+      celulasRespostas.forEach(function(celula) { valores.push(celula.innerText.replace(/\n/g, ' ').trim()); });
+      textoTSV += valores.join('\t') + '\n';
+    });
+    navigator.clipboard.writeText(textoTSV).then(function() { toast('✅ Respostas copiadas (sem cabeçalho)! Cole direto na célula da Q1.', 'success'); }).catch(function() {
+      var textarea = document.createElement('textarea'); textarea.value = textoTSV; document.body.appendChild(textarea); textarea.select(); document.execCommand('copy'); document.body.removeChild(textarea);
+      toast('✅ Respostas copiadas (sem cabeçalho)!', 'success');
+    });
+  }
+
+  // ========================================================================
+  // ✏️ CORRETOR MANUAL DE PROVA
+  // ========================================================================
+  async function carregarSelectsCorretor() {
+    try {
+      var rt = await sbFetch('GET', '/rest/v1/turmas?select=id,nome&order=nome.asc');
+      var turmas = await rt.json();
+      document.getElementById('selTurmaCorretor').innerHTML = '<option value="">Selecione...</option>' + turmas.map(function(t) { return '<option value="' + t.id + '">' + t.nome + '</option>'; }).join('');
+      var rp = await sbFetch('GET', '/rest/v1/avaliacoes?select=id,nome,modo_correcao&order=id.desc');
+      var provas = await rp.json();
+      document.getElementById('selProvaCorretor').innerHTML = '<option value="">Selecione...</option>' + provas.map(function(p) { var tag = p.modo_correcao === 'aberta' ? ' (aberta)' : ' (objetiva)'; return '<option value="' + p.id + '">' + p.nome + tag + '</option>'; }).join('');
+    } catch(e) { console.error(e); }
+  }
+
+  async function carregarAlunosCorretor() {
+    var turmaId = document.getElementById('selTurmaCorretor').value;
+    var provaId = document.getElementById('selProvaCorretor').value;
+    var selAluno = document.getElementById('selAlunoCorretor');
+    if (!turmaId || !provaId) { selAluno.innerHTML = '<option value="">Selecione a turma e prova primeiro...</option>'; return; }
+    selAluno.innerHTML = '<option value="">Carregando...</option>';
+    try {
+      var r = await sbFetch('GET', '/rest/v1/alunos?id_turma=eq.' + turmaId + '&select=id,nome_completo,numero_chamada&order=numero_chamada.asc');
+      var alunos = await r.json();
+      selAluno.innerHTML = '<option value="">Selecione o aluno...</option>' + alunos.map(function(a) { return '<option value="' + a.id + '">' + a.numero_chamada + '. ' + a.nome_completo + '</option>'; }).join('');
+    } catch(e) { selAluno.innerHTML = '<option value="">Erro ao carregar</option>'; }
+  }
+
+  async function carregarRespostasAluno() {
+    var alunoId = document.getElementById('selAlunoCorretor').value;
+    var provaId = document.getElementById('selProvaCorretor').value;
+    var area = document.getElementById('areaCorretorManual');
+    if (!alunoId || !provaId) { area.innerHTML = '<p style="text-align: center; color: #999; font-style: italic;">Selecione o aluno.</p>'; return; }
+    area.innerHTML = '<p style="text-align: center; color: #666;">⏳ Carregando questões...</p>';
+    try {
+      var rQuestoes = await sbFetch('GET', '/rest/v1/questoes?id_avaliacao=eq.' + provaId + '&select=id,numero&order=numero.asc');
+      var questoes = await rQuestoes.json();
+      var rRespostas = await sbFetch('GET', '/rest/v1/respostas?id_aluno=eq.' + alunoId + '&id_avaliacao=eq.' + provaId + '&select=id_questao,resposta_aluno');
+      var respostasSalvas = await rRespostas.json();
+      if (questoes.length === 0) { area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Esta prova não tem questões objetivas.</p>'; return; }
+      
+      var html = '<div style="background: #f8f9fa; padding: 16px; border-radius: 8px;"><h4 style="margin-bottom: 12px; color: #333;">Marque as respostas:</h4>';
+      questoes.forEach(function(q) {
+        var respSalva = respostasSalvas.find(function(r) { return String(r.id_questao) === String(q.id); });
+        var respostaAtual = respSalva ? respSalva.resposta_aluno : '';
+        html += '<div style="margin-bottom: 12px; padding: 8px; background: white; border-radius: 6px;"><strong style="color: #008080;">Questão ' + q.numero + ':</strong><br><div style="display: flex; gap: 8px; margin-top: 6px;">';
+        ['A', 'B', 'C', 'D', 'E'].forEach(function(letra) {
+          var checked = respostaAtual === letra ? 'checked' : '';
+          html += '<label style="display: flex; align-items: center; gap: 4px; cursor: pointer;"><input type="radio" name="q' + q.id + '" value="' + letra + '" ' + checked + '> ' + letra + '</label>';
+        });
+        html += '</div></div>';
+      });
+      html += '<button class="btn btn-primary" style="width: 100%; margin-top: 12px; padding: 12px;" onclick="salvarCorrecaoManual(' + alunoId + ', ' + provaId + ')">💾 SALVAR CORREÇÃO</button></div>';
+      area.innerHTML = html;
+    } catch(e) { console.error(e); area.innerHTML = '<p style="text-align: center; color: #dc3545;">❌ Erro: ' + e.message + '</p>'; }
+  }
+
+  async function salvarCorrecaoManual(alunoId, provaId) {
+    var questoesRadios = document.querySelectorAll('#areaCorretorManual input[type="radio"]');
+    var respostas = {};
+    questoesRadios.forEach(function(radio) {
+      if (radio.checked) {
+        var questaoId = parseInt(radio.name.replace('q', ''));
+        respostas[questaoId] = radio.value;
+      }
+    });
+    if (Object.keys(respostas).length === 0) { toast('Marque pelo menos uma resposta!', 'error'); return; }
+    try {
+      await sbFetch('DELETE', '/rest/v1/respostas?id_aluno=eq.' + alunoId + '&id_avaliacao=eq.' + provaId);
+      var linhas = Object.keys(respostas).map(function(questaoId) {
+        return { id_aluno: parseInt(alunoId), id_avaliacao: parseInt(provaId), id_questao: parseInt(questaoId), resposta_aluno: respostas[questaoId], correta: null };
+      });
+      var r = await sbFetch('POST', '/rest/v1/respostas', linhas);
+      if (r.ok) { toast('✅ Correção salva com sucesso!', 'success'); carregarRespostasAluno(); }
+      else { var erro = await r.json(); toast('Erro: ' + (erro.message || 'Falha ao salvar'), 'error'); }
+    } catch(e) { toast('Erro: ' + e.message, 'error'); }
+  }
+
+  async function gerarPlanoAula() {
+    var tema = document.getElementById('iaTemaAula').value.trim();
+    if (!tema) { toast('Digite o tema da aula!', 'error'); return; }
+    
+    var btn = document.getElementById('btnPlanejarIA');
+    btn.textContent = '⏳ Planejando...'; btn.disabled = true;
+    document.getElementById('iaResultadoPlanejar').innerHTML = '<p style="text-align:center; color:#666;">A IA está montando seu plano...</p>';
+
+    try {
+      var r = await fetch(API_URL + '/api/gerar_plano_aula', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tema: tema,
+          material: document.getElementById('iaMaterial').value,
+          perfil_turma: document.getElementById('iaPerfilTurma').value,
+          duracao: document.getElementById('iaDuracao').value
+        })
+      });
+      var j = await r.json();
+      
+      if (j.sucesso && j.plano) {
+        var p = j.plano;
+        var html = '<div style="background:#f3f0ff; padding:16px; border-radius:8px; border:1px solid #d6bfff;">';
+        
+        html += '<h4 style="color:#6f42c1; margin-bottom:8px;"> Objetivos:</h4><ul style="margin-bottom:16px; padding-left:20px;">';
+        (p.objetivos || []).forEach(o => html += '<li>' + o + '</li>');
+        html += '</ul>';
+
+        html += '<h4 style="color:#6f42c1; margin-bottom:8px;">️ Passo a Passo:</h4>';
+        (p.passo_a_passo || []).forEach((etapa, idx) => {
+          html += '<div style="background:white; padding:10px; margin-bottom:8px; border-radius:6px; border-left:4px solid #6f42c1;">';
+          html += '<strong>' + (etapa.tempo || '') + ' - ' + (etapa.etapa || 'Etapa ' + (idx+1)) + '</strong><br>';
+          html += '<span style="font-size:13px;">' + (etapa.acao || '') + '</span></div>';
+        });
+
+        html += '<h4 style="color:#6f42c1; margin:16px 0 8px 0;"> Avaliação:</h4><p style="font-size:13px;">' + (p.avaliacao || '-') + '</p>';
+        html += '<h4 style="color:#6f42c1; margin:16px 0 8px 0;">🏠 Tarefa de Casa:</h4><p style="font-size:13px;">' + (p.tarefa_casa || '-') + '</p>';
+        html += '</div>';
+        
+        document.getElementById('iaResultadoPlanejar').innerHTML = html;
+        toast('Plano de aula gerado!', 'success');
+      } else {
+        toast('Erro: ' + (j.erro || 'Falha'), 'error');
+      }
+    } catch(e) { toast('Erro de conexão', 'error'); }
+    finally { btn.textContent = '🚀 GERAR PLANO DE AULA'; btn.disabled = false; }
   }
 </script>
 
