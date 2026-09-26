@@ -225,6 +225,11 @@
       <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar"> Identificar</div>
       <div class="ia-tab" onclick="mudarAbaIA('planejar')" id="tabPlanejar">📝 Planejar Aula</div> <!-- NOVA ABA -->
     </div>
+    <div class="ia-tabs">
+      <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
+      <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar">🔍 Identificar</div>
+      <div class="ia-tab" onclick="mudarAbaIA('planejar')" id="tabPlanejar">📝 Planejar Aula</div> <!-- NOVA ABA -->
+    </div>
     <div id="abaGerar">
       <div class="form-row">
         <div class="form-group"><label>Fonte</label><select id="iaFonte"><option value="CP">Currículo Paulista</option><option value="SAEB">SAEB</option></select></div>
@@ -248,6 +253,29 @@
       <div class="form-group"><label>Cole o enunciado da questão pronta:</label><textarea id="iaTextoIdentificar" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui o texto da questão..."></textarea></div>
       <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="identificarHabilidadeIA()" id="btnIdentificarIA">🔍 IDENTIFICAR HABILIDADE</button>
       <div id="iaResultadoIdentificar" style="margin-top: 16px;"></div>
+    </div>
+    <!-- ABA PLANEJAR AULA -->
+    <div id="abaPlanejar" class="hidden">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tema da Aula:</label>
+          <input type="text" id="iaTemaAula" placeholder="Ex: Frações equivalentes">
+        </div>
+        <div class="form-group">
+          <label>Duração:</label>
+          <input type="text" id="iaDuracao" value="50 minutos">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Material Didático da Escola:</label>
+        <input type="text" id="iaMaterial" placeholder="Ex: Apostila do Sistema X, Livro didático Y, Quadro e giz...">
+      </div>
+      <div class="form-group">
+        <label>Perfil da Turma (Dica: copie do Diagnóstico!):</label>
+        <textarea id="iaPerfilTurma" rows="3" placeholder="Ex: A turma tem dificuldade em visualizar frações (D25 com 30% de acerto), mas são bons em cálculos simples..."></textarea>
+      </div>
+      <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarPlanoAula()" id="btnPlanejarIA">🚀 GERAR PLANO DE AULA</button>
+      <div id="iaResultadoPlanejar" style="margin-top: 16px;"></div>
     </div>
   </div>
 </div>
@@ -454,12 +482,12 @@
     document.getElementById('abaIdentificar').classList.add('hidden');
     document.getElementById('abaPlanejar').classList.add('hidden');
     
-    // Remove active de todos os botões
+    // Remove a classe 'active' de todos os botões
     document.getElementById('tabGerar').classList.remove('active');
     document.getElementById('tabIdentificar').classList.remove('active');
     document.getElementById('tabPlanejar').classList.remove('active');
 
-    // Mostra a aba clicada
+    // Mostra a aba clicada e ativa o botão
     if (aba === 'gerar') {
       document.getElementById('abaGerar').classList.remove('hidden');
       document.getElementById('tabGerar').classList.add('active');
@@ -1179,6 +1207,68 @@
       }
     } catch(e) { toast('Erro de conexão', 'error'); }
     finally { btn.textContent = '🚀 GERAR PLANO DE AULA'; btn.disabled = false; }
+  }
+
+  async function gerarPlanoAula() {
+    var tema = document.getElementById('iaTemaAula').value.trim();
+    if (!tema) { toast('Digite o tema da aula!', 'error'); return; }
+    
+    var btn = document.getElementById('btnPlanejarIA');
+    btn.textContent = '⏳ Planejando...'; 
+    btn.disabled = true;
+    document.getElementById('iaResultadoPlanejar').innerHTML = '<p style="text-align:center; color:#666; padding: 20px;">🤖 A IA está montando seu plano de aula passo a passo...</p>';
+
+    try {
+      var r = await fetch(API_URL + '/api/gerar_plano_aula', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tema: tema,
+          material: document.getElementById('iaMaterial').value,
+          perfil_turma: document.getElementById('iaPerfilTurma').value,
+          duracao: document.getElementById('iaDuracao').value
+        })
+      });
+      var j = await r.json();
+      
+      if (j.sucesso && j.plano) {
+        var p = j.plano;
+        var html = '<div style="background:#f3f0ff; padding:20px; border-radius:8px; border:1px solid #d6bfff;">';
+        
+        // Objetivos
+        html += '<h4 style="color:#6f42c1; margin-bottom:8px;">🎯 Objetivos de Aprendizagem:</h4><ul style="margin-bottom:16px; padding-left:20px;">';
+        (p.objetivos || []).forEach(o => html += '<li style="margin-bottom:4px;">' + o + '</li>');
+        html += '</ul>';
+
+        // Passo a Passo
+        html += '<h4 style="color:#6f42c1; margin-bottom:8px;">⏱️ Passo a Passo da Aula:</h4>';
+        (p.passo_a_passo || []).forEach((etapa, idx) => {
+          html += '<div style="background:white; padding:12px; margin-bottom:10px; border-radius:6px; border-left:4px solid #6f42c1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">';
+          html += '<strong style="color:#4A148C;">' + (etapa.tempo || '') + ' - ' + (etapa.etapa || 'Etapa ' + (idx+1)) + '</strong><br>';
+          html += '<span style="font-size:14px; color:#333; margin-top:4px; display:block;">' + (etapa.acao || '') + '</span></div>';
+        });
+
+        // Avaliação e Tarefa
+        html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:16px;">';
+        html += '<div style="background:#FFF8E1; padding:12px; border-radius:6px; border-left:4px solid #FF6F00;"><h4 style="color:#E65100; margin:0 0 8px 0; font-size:14px;">📝 Avaliação:</h4><p style="font-size:13px; margin:0;">' + (p.avaliacao || '-') + '</p></div>';
+        html += '<div style="background:#E8F5E9; padding:12px; border-radius:6px; border-left:4px solid #2E7D32;"><h4 style="color:#2E7D32; margin:0 0 8px 0; font-size:14px;">🏠 Tarefa de Casa:</h4><p style="font-size:13px; margin:0;">' + (p.tarefa_casa || '-') + '</p></div>';
+        html += '</div>';
+        
+        html += '<p style="text-align: center; color: #999; font-size: 11px; margin-top: 16px; font-style: italic;">Gerado por IA (' + (j.modelo || 'Gemini') + ')</p>';
+        html += '</div>';
+        
+        document.getElementById('iaResultadoPlanejar').innerHTML = html;
+        toast('Plano de aula gerado com sucesso!', 'success');
+      } else {
+        toast('Erro: ' + (j.erro || 'Falha ao gerar plano'), 'error');
+      }
+    } catch(e) { 
+      toast('Erro de conexão com a IA', 'error'); 
+    }
+    finally { 
+      btn.textContent = '🚀 GERAR PLANO DE AULA'; 
+      btn.disabled = false; 
+    }
   }
 </script>
 
