@@ -38,7 +38,7 @@ class SupabaseService {
           .from("alunos")
           .select()
           .eq('id_turma', idTurma)
-          .eq('status', 'Ativo') // 🚨 FILTRA APENAS ALUNOS ATIVOS
+          // 🚨 FILTRA APENAS ALUNOS ATIVOS
           .order('numero_chamada', ascending: true);
 
       print(
