@@ -120,8 +120,12 @@
       <div class="form-group"><label>Nome da prova</label><input type="text" id="nomeProva" placeholder="Ex: Prova Aberta - Frações"></div>
       <div class="form-group"><label>Matéria</label>
         <select id="disciplina">
-          <option selected>Matemática</option><option>Português</option><option>História</option><option>Geografia</option>
-          <option>Ciências</option><option>Inglês</option><option>Arte</option><option>Sociologia</option><option>Filosofia</option>
+          <option value="Matemática">Matemática</option>
+          <option value="Educação Física">Educação Física</option>
+          <option value="Língua Portuguesa">Língua Portuguesa</option>
+          <option value="Ciências">Ciências</option>
+          <option value="História">História</option>
+          <option value="Geografia">Geografia</option>
         </select>
       </div>
       <div class="form-row">
@@ -200,7 +204,7 @@
   </div> <!-- Fim do container -->
 </div> <!-- Fim do mainScreen -->
 
-<!-- Modais (Colar, IA, QR, Cartões, Recuperação) -->
+<!-- Modais -->
 <div id="modalColar" class="modal">
   <div class="modal-content">
     <div class="modal-header"><h3>📋 Colar prova do Word/Docs</h3><button class="btn btn-sm" onclick="fecharModal('modalColar')">✕</button></div>
@@ -216,25 +220,32 @@
 <div id="modalIA" class="modal">
   <div class="modal-content">
     <div class="modal-header"><h3>🤖 Assistente Pedagógico IA</h3><button class="btn btn-sm" onclick="fecharModal('modalIA')">✕</button></div>
-    <div class="ia-tabs">
-      <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
-      <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar">🔍 Identificar Habilidade</div>
-    </div>
-    <div class="ia-tabs">
-      <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
-      <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar"> Identificar</div>
-      <div class="ia-tab" onclick="mudarAbaIA('planejar')" id="tabPlanejar">📝 Planejar Aula</div> <!-- NOVA ABA -->
-    </div>
+    
+    <!-- ABAS LIMPAS E SEM DUPLICATA -->
     <div class="ia-tabs">
       <div class="ia-tab active" onclick="mudarAbaIA('gerar')" id="tabGerar">✨ Gerar Questões</div>
       <div class="ia-tab" onclick="mudarAbaIA('identificar')" id="tabIdentificar">🔍 Identificar</div>
-      <div class="ia-tab" onclick="mudarAbaIA('planejar')" id="tabPlanejar">📝 Planejar Aula</div> <!-- NOVA ABA -->
+      <div class="ia-tab" onclick="mudarAbaIA('planejar')" id="tabPlanejar">📝 Planejar Aula</div>
     </div>
+
+    <!-- ABA GERAR -->
     <div id="abaGerar">
       <div class="form-row">
         <div class="form-group"><label>Fonte</label><select id="iaFonte"><option value="CP">Currículo Paulista</option><option value="SAEB">SAEB</option></select></div>
-        <div class="form-group"><label>Ano</label><select id="iaAno"><option value="5">5º ano</option><option value="6" selected>6º ano</option><option value="9">9º ano</option></select></div>
-        <div class="form-group"><label>Quantidade</label><select id="iaQtd"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+        <div class="form-group"><label>Ano</label>
+          <select id="iaAno">
+            <option value="1">1º Ano</option>
+            <option value="2">2º Ano</option>
+            <option value="3">3º Ano</option>
+            <option value="4">4º Ano</option>
+            <option value="5">5º Ano</option>
+            <option value="6">6º Ano</option>
+            <option value="7">7º Ano</option>
+            <option value="8">8º Ano</option>
+            <option value="9">9º Ano</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Quantidade</label><select id="iaQtd"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select></div>
       </div>
       <div class="form-row">
         <div class="form-group"><label>Dificuldade</label><select id="iaDificuldade"><option value="fácil">Fácil</option><option value="média" selected>Média</option><option value="difícil">Difícil</option></select></div>
@@ -249,59 +260,28 @@
       <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarQuestoesIA()" id="btnGerarIA">✨ GERAR QUESTÕES COM IA</button>
       <div id="iaResultadoGerar" style="margin-top: 16px;"></div>
     </div>
+
+    <!-- ABA IDENTIFICAR -->
     <div id="abaIdentificar" class="hidden">
       <div class="form-group"><label>Cole o enunciado da questão pronta:</label><textarea id="iaTextoIdentificar" rows="6" style="width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 6px;" placeholder="Cole aqui o texto da questão..."></textarea></div>
       <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="identificarHabilidadeIA()" id="btnIdentificarIA">🔍 IDENTIFICAR HABILIDADE</button>
       <div id="iaResultadoIdentificar" style="margin-top: 16px;"></div>
     </div>
+
     <!-- ABA PLANEJAR AULA -->
     <div id="abaPlanejar" class="hidden">
       <div class="form-row">
-        <div class="form-group">
-          <label>Tema da Aula:</label>
-          <input type="text" id="iaTemaAula" placeholder="Ex: Frações equivalentes">
-        </div>
-        <div class="form-group">
-          <label>Duração:</label>
-          <input type="text" id="iaDuracao" value="50 minutos">
-        </div>
+        <div class="form-group"><label>Tema da Aula:</label><input type="text" id="iaTemaAula" placeholder="Ex: Frações equivalentes"></div>
+        <div class="form-group"><label>Duração:</label><input type="text" id="iaDuracao" value="50 minutos"></div>
       </div>
-      <div class="form-group">
-        <label>Material Didático da Escola:</label>
-        <input type="text" id="iaMaterial" placeholder="Ex: Apostila do Sistema X, Livro didático Y, Quadro e giz...">
-      </div>
-      <div class="form-group">
-        <label>Perfil da Turma (Dica: copie do Diagnóstico!):</label>
-        <textarea id="iaPerfilTurma" rows="3" placeholder="Ex: A turma tem dificuldade em visualizar frações (D25 com 30% de acerto), mas são bons em cálculos simples..."></textarea>
-      </div>
+      <div class="form-group"><label>Material Didático da Escola:</label><input type="text" id="iaMaterial" placeholder="Ex: Apostila do Sistema X, Livro didático Y..."></div>
+      <div class="form-group"><label>Perfil da Turma (Copie do Diagnóstico se quiser):</label><textarea id="iaPerfilTurma" rows="3" placeholder="Ex: A turma tem dificuldade em visualizar frações, mas são bons em cálculos simples..."></textarea></div>
       <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarPlanoAula()" id="btnPlanejarIA">🚀 GERAR PLANO DE AULA</button>
       <div id="iaResultadoPlanejar" style="margin-top: 16px;"></div>
     </div>
+
   </div>
 </div>
-<!-- ABA PLANEJAR AULA -->
-    <div id="abaPlanejar" class="hidden">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Tema da Aula:</label>
-          <input type="text" id="iaTemaAula" placeholder="Ex: Frações equivalentes">
-        </div>
-        <div class="form-group">
-          <label>Duração:</label>
-          <input type="text" id="iaDuracao" value="50 minutos">
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Material Didático da Escola:</label>
-        <input type="text" id="iaMaterial" placeholder="Ex: Apostila do Sistema X, Livro didático Y...">
-      </div>
-      <div class="form-group">
-        <label>Perfil da Turma (Copie do Diagnóstico se quiser):</label>
-        <textarea id="iaPerfilTurma" rows="3" placeholder="Ex: A turma tem dificuldade em visualizar frações, mas são bons em cálculos simples..."></textarea>
-      </div>
-      <button class="btn btn-ia" style="width: 100%; padding: 12px;" onclick="gerarPlanoAula()" id="btnPlanejarIA">🚀 GERAR PLANO DE AULA</button>
-      <div id="iaResultadoPlanejar" style="margin-top: 16px;"></div>
-    </div>
 
 <div id="modalQR" class="modal">
   <div class="modal-content" style="text-align: center;">
@@ -415,7 +395,7 @@
     carregarSelectsQR();
     carregarProvasDiagnostico();
     carregarSelectsPlanilha();
-    carregarSelectsCorretor(); // <-- Carrega o Corretor Manual
+    carregarSelectsCorretor();
   }
 
   function novaQuestao() { return { enunciado: '', resposta: '', valor: '2', imagemUrl: null, file: null }; }
@@ -474,20 +454,17 @@
     toast(novas.length + ' questão(ões) importada(s)!', 'success');
   }
 
-  function abrirModalIA() { document.getElementById('modalIA').classList.add('active'); mudarAbaIA('gerar'); document.getElementById('iaResultadoGerar').innerHTML = ''; document.getElementById('iaResultadoIdentificar').innerHTML = ''; }
+  function abrirModalIA() { document.getElementById('modalIA').classList.add('active'); mudarAbaIA('gerar'); document.getElementById('iaResultadoGerar').innerHTML = ''; document.getElementById('iaResultadoIdentificar').innerHTML = ''; document.getElementById('iaResultadoPlanejar').innerHTML = ''; }
  
   function mudarAbaIA(aba) {
-    // Esconde todas as abas
     document.getElementById('abaGerar').classList.add('hidden');
     document.getElementById('abaIdentificar').classList.add('hidden');
     document.getElementById('abaPlanejar').classList.add('hidden');
     
-    // Remove a classe 'active' de todos os botões
     document.getElementById('tabGerar').classList.remove('active');
     document.getElementById('tabIdentificar').classList.remove('active');
     document.getElementById('tabPlanejar').classList.remove('active');
 
-    // Mostra a aba clicada e ativa o botão
     if (aba === 'gerar') {
       document.getElementById('abaGerar').classList.remove('hidden');
       document.getElementById('tabGerar').classList.add('active');
@@ -502,17 +479,23 @@
 
   async function carregarMatrizIA() {
     var fonte = document.getElementById('iaFonte').value;
-    var ano = document.getElementById('iaAno').value;
+    var ano = document.getElementById('iaAno').value; // <-- CORRIGIDO: Agora busca pelo ID correto
+    var disciplina = document.getElementById('disciplina').value; // <-- ADICIONADO: Filtra pela matéria selecionada
     var container = document.getElementById('iaListaHabilidades');
     container.innerHTML = '<p style="text-align:center; color:#666;">Carregando...</p>';
     try {
-      var r = await fetch(API_URL + '/api/matriz?fonte=' + fonte + '&ano=' + ano);
+      var url = API_URL + '/api/matriz?fonte=' + fonte + '&ano=' + ano + '&disciplina=' + encodeURIComponent(disciplina);
+      var r = await fetch(url);
       var j = await r.json();
       if (j.sucesso && j.itens) {
         matrizHabilidades = j.itens;
-        container.innerHTML = matrizHabilidades.map(function(item) {
-          return '<label class="habilidade-item"><input type="checkbox" value="' + item.codigo + '"> <strong>' + item.codigo + '</strong>: ' + item.descricao + '</label>';
-        }).join('');
+        if (matrizHabilidades.length === 0) {
+          container.innerHTML = '<p style="color:#666; text-align:center;">Nenhuma habilidade encontrada para esta seleção.</p>';
+        } else {
+          container.innerHTML = matrizHabilidades.map(function(item) {
+            return '<label class="habilidade-item"><input type="checkbox" value="' + item.codigo + '"> <strong>' + item.codigo + '</strong>: ' + item.habilidade + '</label>';
+          }).join('');
+        }
       } else { container.innerHTML = '<p style="color:red; text-align:center;">Erro ao carregar matriz.</p>'; }
     } catch (e) { container.innerHTML = '<p style="color:red; text-align:center;">Falha na conexão com a API.</p>'; }
   }
@@ -524,7 +507,7 @@
     var btn = document.getElementById('btnGerarIA');
     btn.textContent = '⏳ Gerando...'; btn.disabled = true;
     try {
-      var payload = { codigos: codigos, fonte: document.getElementById('iaFonte').value, componente: 'Matemática', ano: parseInt(document.getElementById('iaAno').value), quantidade: parseInt(document.getElementById('iaQtd').value), dificuldade: document.getElementById('iaDificuldade').value, contexto: document.getElementById('iaContexto').value, valor_padrao: 2.0 };
+      var payload = { codigos: codigos, fonte: document.getElementById('iaFonte').value, componente: document.getElementById('disciplina').value, ano: parseInt(document.getElementById('iaAno').value), quantidade: parseInt(document.getElementById('iaQtd').value), dificuldade: document.getElementById('iaDificuldade').value, contexto: document.getElementById('iaContexto').value, valor_padrao: 2.0 };
       var r = await fetch(API_URL + '/api/gerar_questoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       var j = await r.json();
       if (j.sucesso && j.questoes) {
@@ -556,7 +539,7 @@
     if (texto.length < 10) { toast('Cole o texto completo da questão!', 'error'); return; }
     var btn = document.getElementById('btnIdentificarIA'); btn.textContent = '⏳ Identificando...'; btn.disabled = true;
     try {
-      var payload = { texto: texto, fonte: document.getElementById('iaFonte').value, componente: 'Matemática', ano: parseInt(document.getElementById('iaAno').value) };
+      var payload = { texto: texto, fonte: document.getElementById('iaFonte').value, componente: document.getElementById('disciplina').value, ano: parseInt(document.getElementById('iaAno').value) };
       var r = await fetch(API_URL + '/api/identificar_habilidade', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       var j = await r.json();
       if (j.sucesso && j.resultados) {
@@ -841,23 +824,19 @@
       return;
     }
 
-    // 1️⃣ PERGUNTA A QUANTIDADE DE ATIVIDADES
     var qtd = prompt('Quantas atividades de recuperação você deseja gerar?', '3');
-    if (!qtd) return; // Se o usuário cancelar, para aqui
+    if (!qtd) return;
 
-    // 2️⃣ PERGUNTA ANO E DISCIPLINA
     var ano = prompt('Para qual ano é o plano de recuperação?', '6');
     if (!ano) return;
     var componente = prompt('Qual a disciplina?', 'Matemática');
     if (!componente) return;
 
-    // 3️⃣ ABRE O MODAL COM MENSAGEM DE CARREGAMENTO
     var area = document.getElementById('areaPlanoRecuperacao');
     area.innerHTML = '<div style="text-align: center; padding: 40px;"><p style="font-size: 18px; color: #6f42c1;">🤖 A IA está criando o plano...</p><p style="color: #666; margin-top: 8px;">Gerando ' + qtd + ' atividades focadas nos descritores/habilidades com menor desempenho</p></div>';
     document.getElementById('modalRecuperacao').classList.add('active');
 
     try {
-      // 4️⃣ ENVIA OS DADOS PARA O BACKEND (INCLUINDO A QUANTIDADE)
       var r = await fetch(API_URL + '/api/gerar_plano_recuperacao', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -866,7 +845,7 @@
           tipo_analise: window.tipoAnaliseAtual === 'habilidade' ? 'Habilidade' : 'Descritor',
           ano: parseInt(ano),
           componente: componente,
-          quantidade: parseInt(qtd) // <-- AQUI ESTÁ A MÁGICA: enviamos a quantidade escolhida
+          quantidade: parseInt(qtd)
         })
       });
 
@@ -876,14 +855,12 @@
         var plano = j.plano;
         var html = '';
 
-        // Cabeçalho do Plano
         html += '<div style="background: linear-gradient(135deg, #6f42c1, #4A148C); color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">';
         html += '<h2 style="margin: 0 0 8px 0;">📋 ' + (plano.titulo || 'Plano de Recuperação Dirigida') + '</h2>';
         html += '<p style="margin: 0; font-size: 14px; opacity: 0.95;">' + (plano.plano || plano.justificativa || '') + '</p>';
         html += '<p style="margin: 8px 0 0 0; font-size: 12px; opacity: 0.8;">🎯 Foco: ' + itens.map(function(i) { return i.chave; }).join(', ') + '</p>';
         html += '</div>';
 
-        // Lista de Atividades
         if (plano.atividades && plano.atividades.length > 0) {
           html += '<h3 style="color: #4A148C; margin-bottom: 12px;">📚 Atividades Sugeridas</h3>';
           plano.atividades.forEach(function(atv, idx) {
@@ -899,7 +876,6 @@
           });
         }
 
-        // Sugestões adicionais
         if (plano.sugestoes && plano.sugestoes.length > 0) {
           html += '<div style="background: #FFF8E1; padding: 16px; border-radius: 8px; border-left: 4px solid #FF6F00; margin-top: 16px;">';
           html += '<h4 style="color: #E65100; margin: 0 0 8px 0;">💡 Sugestões Adicionais</h4>';
@@ -910,7 +886,6 @@
           html += '</ul></div>';
         }
 
-        // Rodapé
         html += '<p style="text-align: center; color: #999; font-size: 11px; margin-top: 20px; font-style: italic;">Plano gerado por IA (modelo: ' + (j.modelo || 'Gemini') + ') em ' + new Date().toLocaleString('pt-BR') + '</p>';
 
         area.innerHTML = html;
@@ -941,114 +916,106 @@
   }
 
   async function gerarTabelaPlanilha() {
-  var turmaId = document.getElementById('selTurmaPlanilha').value;
-  var provaId = document.getElementById('selProvaPlanilha').value;
-  var area = document.getElementById('areaTabelaPlanilha');
+    var turmaId = document.getElementById('selTurmaPlanilha').value;
+    var provaId = document.getElementById('selProvaPlanilha').value;
+    var area = document.getElementById('areaTabelaPlanilha');
 
-  if (!turmaId || !provaId) {
-    toast('Selecione a turma e a prova!', 'error');
-    return;
-  }
-
-  area.innerHTML = '<p style="text-align: center; color: #666;"> Gerando tabela...</p>';
-
-  try {
-    // 🔥 BUSCA 1: Todos os alunos da turma
-    var rAlunos = await sbFetch('GET', '/rest/v1/alunos?id_turma=eq.' + turmaId + '&select=id,nome_completo,numero_chamada&order=numero_chamada.asc');
-    var alunos = await rAlunos.json();
-    if (!Array.isArray(alunos) || alunos.length === 0) {
-      area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhum aluno encontrado nesta turma.</p>';
+    if (!turmaId || !provaId) {
+      toast('Selecione a turma e a prova!', 'error');
       return;
     }
 
-    // 🔥 BUSCA 2: Questões da prova
-    var rQuestoes = await sbFetch('GET', '/rest/v1/questoes?id_avaliacao=eq.' + provaId + '&select=id,numero&order=numero.asc');
-    var questoes = await rQuestoes.json();
-    if (!Array.isArray(questoes)) questoes = [];
+    area.innerHTML = '<p style="text-align: center; color: #666;"> Gerando tabela...</p>';
 
-    if (questoes.length === 0) {
-      area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhuma questão encontrada para esta prova.</p>';
-      return;
-    }
-
-    // 🔥 BUSCA 3: Respostas FILTRADAS apenas pelos alunos desta turma
-    var idsAlunos = alunos.map(function(a) { return a.id; }).join(',');
-    var rRespostas = await sbFetch('GET', '/rest/v1/respostas?id_avaliacao=eq.' + provaId + '&id_aluno=in.(' + idsAlunos + ')&select=id_aluno,id_questao,resposta_aluno,correta');
-    var respostas = await rRespostas.json();
-    if (!Array.isArray(respostas)) respostas = [];
-
-    // 🔥 AGRUPAR RESPOSTAS POR ALUNO
-    var respostasPorAluno = {};
-    respostas.forEach(function(resp) {
-      var alunoId = resp.id_aluno;
-      if (!respostasPorAluno[alunoId]) {
-        respostasPorAluno[alunoId] = {};
+    try {
+      var rAlunos = await sbFetch('GET', '/rest/v1/alunos?id_turma=eq.' + turmaId + '&select=id,nome_completo,numero_chamada&order=numero_chamada.asc');
+      var alunos = await rAlunos.json();
+      if (!Array.isArray(alunos) || alunos.length === 0) {
+        area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhum aluno encontrado nesta turma.</p>';
+        return;
       }
-      respostasPorAluno[alunoId][resp.id_questao] = {
-        resposta: resp.resposta_aluno || '',
-        correta: resp.correta
-      };
-    });
 
-    // 🔥 MONTAR TABELA HTML
-    var html = '<div style="overflow-x: auto;">';
-    html += '<table id="tabelaPlanilha" style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: Arial;">';
+      var rQuestoes = await sbFetch('GET', '/rest/v1/questoes?id_avaliacao=eq.' + provaId + '&select=id,numero&order=numero.asc');
+      var questoes = await rQuestoes.json();
+      if (!Array.isArray(questoes)) questoes = [];
 
-    // Cabeçalho
-    html += '<thead><tr style="background: #e0e0e0;">';
-    html += '<th style="border: 1px solid #999; padding: 6px;">Nº</th>';
-    html += '<th style="border: 1px solid #999; padding: 6px;">Aluno</th>';
-    html += '<th style="border: 1px solid #999; padding: 6px;">Status</th>';
-    questoes.forEach(function(q) {
-      html += '<th style="border: 1px solid #999; padding: 6px;">Q' + q.numero + '</th>';
-    });
-    html += '</tr></thead><tbody>';
+      if (questoes.length === 0) {
+        area.innerHTML = '<p style="text-align: center; color: #dc3545;">⚠️ Nenhuma questão encontrada para esta prova.</p>';
+        return;
+      }
 
-    // Linhas dos alunos
-    alunos.forEach(function(aluno) {
-      var respostasAluno = respostasPorAluno[aluno.id] || {};
-      var temRespostas = Object.keys(respostasAluno).length > 0;
-      var status = temRespostas ? 'Corrigido' : 'Pendente';
-      var corStatus = temRespostas ? '#28a745' : '#ffc107';
+      var idsAlunos = alunos.map(function(a) { return a.id; }).join(',');
+      var rRespostas = await sbFetch('GET', '/rest/v1/respostas?id_avaliacao=eq.' + provaId + '&id_aluno=in.(' + idsAlunos + ')&select=id_aluno,id_questao,resposta_aluno,correta');
+      var respostas = await rRespostas.json();
+      if (!Array.isArray(respostas)) respostas = [];
 
-      html += '<tr>';
-      html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' + (aluno.numero_chamada || '-') + '</td>';
-      html += '<td style="border: 1px solid #ccc; padding: 4px;">' + (aluno.nome_completo || 'Sem nome') + '</td>';
-      html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center; color: ' + corStatus + '; font-weight: bold;">' + status + '</td>';
-
-      questoes.forEach(function(q) {
-        var resp = respostasAluno[q.numero];
-        var respostaTexto = '';
-        var corFundo = '#fff';
-
-        if (resp) {
-          respostaTexto = resp.resposta || (resp.correta ? '✓' : '✗');
-          corFundo = resp.correta ? '#d4edda' : (resp.resposta ? '#f8d7da' : '#fff');
+      var respostasPorAluno = {};
+      respostas.forEach(function(resp) {
+        var alunoId = resp.id_aluno;
+        if (!respostasPorAluno[alunoId]) {
+          respostasPorAluno[alunoId] = {};
         }
-
-        html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center; background: ' + corFundo + ';">' + respostaTexto + '</td>';
+        respostasPorAluno[alunoId][resp.id_questao] = {
+          resposta: resp.resposta_aluno || '',
+          correta: resp.correta
+        };
       });
 
-      html += '</tr>';
-    });
+      var html = '<div style="overflow-x: auto;">';
+      html += '<table id="tabelaPlanilha" style="width: 100%; border-collapse: collapse; font-size: 12px; font-family: Arial;">';
 
-    html += '</tbody></table></div>';
+      html += '<thead><tr style="background: #e0e0e0;">';
+      html += '<th style="border: 1px solid #999; padding: 6px;">Nº</th>';
+      html += '<th style="border: 1px solid #999; padding: 6px;">Aluno</th>';
+      html += '<th style="border: 1px solid #999; padding: 6px;">Status</th>';
+      questoes.forEach(function(q) {
+        html += '<th style="border: 1px solid #999; padding: 6px;">Q' + q.numero + '</th>';
+      });
+      html += '</tr></thead><tbody>';
 
-    // Botões de copiar
-    html += '<div style="display: flex; gap: 8px; margin-top: 12px;">';
-    html += '<button class="btn btn-primary" style="flex: 1; padding: 12px;" onclick="copiarParaPlanilha()">📋 COPIAR TUDO</button>';
-    html += '<button class="btn btn-secondary" style="flex: 1; padding: 12px;" onclick="copiarApenasRespostas()">📋 COPIAR APENAS RESPOSTAS</button>';
-    html += '</div>';
-    html += '<p style="font-size: 11px; color: #666; text-align: center; margin-top: 8px;">💡 Use o primeiro botão para planilhas novas. Use o segundo para colar apenas as respostas na planilha da escola.</p>';
+      alunos.forEach(function(aluno) {
+        var respostasAluno = respostasPorAluno[aluno.id] || {};
+        var temRespostas = Object.keys(respostasAluno).length > 0;
+        var status = temRespostas ? 'Corrigido' : 'Pendente';
+        var corStatus = temRespostas ? '#28a745' : '#ffc107';
 
-    area.innerHTML = html;
-    toast('✅ Tabela gerada com sucesso! ' + alunos.length + ' alunos carregados.', 'success');
+        html += '<tr>';
+        html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center;">' + (aluno.numero_chamada || '-') + '</td>';
+        html += '<td style="border: 1px solid #ccc; padding: 4px;">' + (aluno.nome_completo || 'Sem nome') + '</td>';
+        html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center; color: ' + corStatus + '; font-weight: bold;">' + status + '</td>';
 
-  } catch(e) {
-    console.error(e);
-    area.innerHTML = '<p style="text-align: center; color: #dc3545;">❌ Erro: ' + e.message + '</p>';
+        questoes.forEach(function(q) {
+          var resp = respostasAluno[q.numero];
+          var respostaTexto = '';
+          var corFundo = '#fff';
+
+          if (resp) {
+            respostaTexto = resp.resposta || (resp.correta ? '✓' : '✗');
+            corFundo = resp.correta ? '#d4edda' : (resp.resposta ? '#f8d7da' : '#fff');
+          }
+
+          html += '<td style="border: 1px solid #ccc; padding: 4px; text-align: center; background: ' + corFundo + ';">' + respostaTexto + '</td>';
+        });
+
+        html += '</tr>';
+      });
+
+      html += '</tbody></table></div>';
+
+      html += '<div style="display: flex; gap: 8px; margin-top: 12px;">';
+      html += '<button class="btn btn-primary" style="flex: 1; padding: 12px;" onclick="copiarParaPlanilha()">📋 COPIAR TUDO</button>';
+      html += '<button class="btn btn-secondary" style="flex: 1; padding: 12px;" onclick="copiarApenasRespostas()">📋 COPIAR APENAS RESPOSTAS</button>';
+      html += '</div>';
+      html += '<p style="font-size: 11px; color: #666; text-align: center; margin-top: 8px;">💡 Use o primeiro botão para planilhas novas. Use o segundo para colar apenas as respostas na planilha da escola.</p>';
+
+      area.innerHTML = html;
+      toast('✅ Tabela gerada com sucesso! ' + alunos.length + ' alunos carregados.', 'success');
+
+    } catch(e) {
+      console.error(e);
+      area.innerHTML = '<p style="text-align: center; color: #dc3545;">❌ Erro: ' + e.message + '</p>';
+    }
   }
-}
 
   function copiarParaPlanilha() {
     var tabela = document.getElementById('tabelaPlanilha');
@@ -1160,55 +1127,9 @@
     } catch(e) { toast('Erro: ' + e.message, 'error'); }
   }
 
-  async function gerarPlanoAula() {
-    var tema = document.getElementById('iaTemaAula').value.trim();
-    if (!tema) { toast('Digite o tema da aula!', 'error'); return; }
-    
-    var btn = document.getElementById('btnPlanejarIA');
-    btn.textContent = '⏳ Planejando...'; btn.disabled = true;
-    document.getElementById('iaResultadoPlanejar').innerHTML = '<p style="text-align:center; color:#666;">A IA está montando seu plano...</p>';
-
-    try {
-      var r = await fetch(API_URL + '/api/gerar_plano_aula', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tema: tema,
-          material: document.getElementById('iaMaterial').value,
-          perfil_turma: document.getElementById('iaPerfilTurma').value,
-          duracao: document.getElementById('iaDuracao').value
-        })
-      });
-      var j = await r.json();
-      
-      if (j.sucesso && j.plano) {
-        var p = j.plano;
-        var html = '<div style="background:#f3f0ff; padding:16px; border-radius:8px; border:1px solid #d6bfff;">';
-        
-        html += '<h4 style="color:#6f42c1; margin-bottom:8px;"> Objetivos:</h4><ul style="margin-bottom:16px; padding-left:20px;">';
-        (p.objetivos || []).forEach(o => html += '<li>' + o + '</li>');
-        html += '</ul>';
-
-        html += '<h4 style="color:#6f42c1; margin-bottom:8px;">️ Passo a Passo:</h4>';
-        (p.passo_a_passo || []).forEach((etapa, idx) => {
-          html += '<div style="background:white; padding:10px; margin-bottom:8px; border-radius:6px; border-left:4px solid #6f42c1;">';
-          html += '<strong>' + (etapa.tempo || '') + ' - ' + (etapa.etapa || 'Etapa ' + (idx+1)) + '</strong><br>';
-          html += '<span style="font-size:13px;">' + (etapa.acao || '') + '</span></div>';
-        });
-
-        html += '<h4 style="color:#6f42c1; margin:16px 0 8px 0;"> Avaliação:</h4><p style="font-size:13px;">' + (p.avaliacao || '-') + '</p>';
-        html += '<h4 style="color:#6f42c1; margin:16px 0 8px 0;">🏠 Tarefa de Casa:</h4><p style="font-size:13px;">' + (p.tarefa_casa || '-') + '</p>';
-        html += '</div>';
-        
-        document.getElementById('iaResultadoPlanejar').innerHTML = html;
-        toast('Plano de aula gerado!', 'success');
-      } else {
-        toast('Erro: ' + (j.erro || 'Falha'), 'error');
-      }
-    } catch(e) { toast('Erro de conexão', 'error'); }
-    finally { btn.textContent = '🚀 GERAR PLANO DE AULA'; btn.disabled = false; }
-  }
-
+  // ========================================================================
+  // 📝 FUNÇÃO ÚNICA DE PLANEJAMENTO DE AULA (DUPLICATA REMOVIDA)
+  // ========================================================================
   async function gerarPlanoAula() {
     var tema = document.getElementById('iaTemaAula').value.trim();
     if (!tema) { toast('Digite o tema da aula!', 'error'); return; }
@@ -1235,12 +1156,10 @@
         var p = j.plano;
         var html = '<div style="background:#f3f0ff; padding:20px; border-radius:8px; border:1px solid #d6bfff;">';
         
-        // Objetivos
         html += '<h4 style="color:#6f42c1; margin-bottom:8px;">🎯 Objetivos de Aprendizagem:</h4><ul style="margin-bottom:16px; padding-left:20px;">';
         (p.objetivos || []).forEach(o => html += '<li style="margin-bottom:4px;">' + o + '</li>');
         html += '</ul>';
 
-        // Passo a Passo
         html += '<h4 style="color:#6f42c1; margin-bottom:8px;">⏱️ Passo a Passo da Aula:</h4>';
         (p.passo_a_passo || []).forEach((etapa, idx) => {
           html += '<div style="background:white; padding:12px; margin-bottom:10px; border-radius:6px; border-left:4px solid #6f42c1; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">';
@@ -1248,7 +1167,6 @@
           html += '<span style="font-size:14px; color:#333; margin-top:4px; display:block;">' + (etapa.acao || '') + '</span></div>';
         });
 
-        // Avaliação e Tarefa
         html += '<div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:16px;">';
         html += '<div style="background:#FFF8E1; padding:12px; border-radius:6px; border-left:4px solid #FF6F00;"><h4 style="color:#E65100; margin:0 0 8px 0; font-size:14px;">📝 Avaliação:</h4><p style="font-size:13px; margin:0;">' + (p.avaliacao || '-') + '</p></div>';
         html += '<div style="background:#E8F5E9; padding:12px; border-radius:6px; border-left:4px solid #2E7D32;"><h4 style="color:#2E7D32; margin:0 0 8px 0; font-size:14px;">🏠 Tarefa de Casa:</h4><p style="font-size:13px; margin:0;">' + (p.tarefa_casa || '-') + '</p></div>';
